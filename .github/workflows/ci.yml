@@ -58,7 +58,7 @@ jobs:
           echo "Waiting for app to be healthy..."
           for i in $(seq 1 30); do
             # Lakukan request ke halaman utama
-            if curl -sf http://localhost:8085/ > /dev/null 2>&1; then
+            if curl -sf http://localhost:8086/ > /dev/null 2>&1; then
               echo "App is ready!"
               break
             fi
@@ -66,7 +66,7 @@ jobs:
             sleep 3
           done
           # Final check — fail fast if app never came up
-          curl -sf http://localhost:8085/ || (echo "App failed to start!" && docker compose logs app && exit 1)
+          curl -sf http://localhost:8086/ || (echo "App failed to start!" && docker compose logs app && exit 1)
 
       - name: App test (Artisan Test)
         run: |
@@ -74,7 +74,7 @@ jobs:
 
       - name: Smoke test App (UI)
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8085/ || echo "000")
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8086/ || echo "000")
           echo "App HTTP STATUS: $code"
           test "$code" -lt 500
 
