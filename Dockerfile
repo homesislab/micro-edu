@@ -19,6 +19,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
+# Suppress FQDN warning
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
 # Update Apache DocumentRoot to point to Laravel's public directory
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
