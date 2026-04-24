@@ -8,16 +8,13 @@ services:
     restart: unless-stopped
     ports:
       - "8086:80"
+    env_file:
+      - .env
     environment:
-      - DB_CONNECTION=mysql
       - DB_HOST=172.26.0.10
-      - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE:-micro_edu}
-      - DB_USERNAME=${DB_USERNAME:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-}
       - REDIS_HOST=172.31.0.2
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-rahasiamanggie123} # Matching past conversations
+      - DB_PASSWORD=${DB_PASSWORD:-Moalnyaho123}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-rahasiamanggie123}
     networks:
       - shared_apps
 
