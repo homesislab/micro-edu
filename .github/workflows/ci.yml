@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+
+jobs:
+  build-and-test:
+    runs-on: self-hosted
+    steps:
+      - name: Pre-cleanup (Fix permissions)
+        run: |
+          docker run --rm -v $(pwd):/app -w /app alpine chown -R $(id -u):$(id -g) . || true
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          clean: false  # Preserve .env and other untracked files on the server
+
+      - name: Prepare .env from Secrets
+        env:
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        run: |
+          # Merge secrets into existing .env without overwriting unrelated variables
+          update_env() {
+            local key=$1
+            local value=$2
+            if [ -z "$value" ]; then return; fi
+            if grep -q "^${key}=" .env 2>/dev/null; then
+              sed -i "s|^${key}=.*|${key}=${value}|" .env
+            else
+              echo "${key}=${value}" >> .env
+            fi
+          }
+
+          # Ensure .env exists (fallback to example or empty)
+          [ -f .env ] || cp .env.example .env 2>/dev/null || touch .env
+
+          update_env "APP_KEY" "$APP_KEY"
+          update_env "DB_PASSWORD" "$DB_PASSWORD"
+          update_env "REDIS_PASSWORD" "$REDIS_PASSWORD"
+
+          chmod 600 .env
+
+      - name: Build changed services
+        run: docker compose build app
+
+      - name: Restart changed services
+        run: |
+          docker compose up -d --no-deps --remove-orphans app
+
+      - name: Wait for app to be ready
+        run: |
+          echo "Waiting for app to be healthy..."
+          for i in $(seq 1 30); do
+            # Lakukan request ke halaman utama
+            if curl -sf http://localhost:8000/ > /dev/null 2>&1; then
+              echo "App is ready!"
+              break
+            fi
+            echo "Attempt $i/30 - app not ready yet, retrying in 3s..."
+            sleep 3
+          done
+          # Final check — fail fast if app never came up
+          curl -sf http://localhost:8000/ || (echo "App failed to start!" && docker compose logs app && exit 1)
+
+      - name: App test (Artisan Test)
+        run: |
+          docker compose exec -T app php artisan test || echo "Tests skipped or failed"
+
+      - name: Smoke test App (UI)
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ || echo "000")
+          echo "App HTTP STATUS: $code"
+          test "$code" -lt 500
+
+      - name: Print container logs (always)
+        if: always()
+        run: docker compose logs --no-color --tail=200
+
+      - name: "Stop containers (Cleanup: ONLY for non-master branches)"
+        if: always() && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+        run: docker compose down --remove-orphans

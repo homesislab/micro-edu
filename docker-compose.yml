@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: micro-edu-app:latest
+    container_name: micro_edu_app
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=172.26.0.10
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-micro_edu}
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - REDIS_HOST=172.31.0.2
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-rahasiamanggie123} # Matching past conversations
+    networks:
+      - shared_apps
+
+networks:
+  shared_apps:
+    external: true
