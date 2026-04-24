@@ -10,7 +10,10 @@ import {
     BookOpen,
     ArrowRight,
     X,
-    Loader2
+    Loader2,
+    Trash2,
+    Rocket,
+    Clock
 } from 'lucide-vue-next';
 import Modal from '@/Components/Modal.vue';
 import InputError from '@/Components/InputError.vue';
@@ -44,6 +47,21 @@ const submitCreateCourse = () => {
             showCreateModal.value = false;
             createForm.reset();
         }
+    });
+};
+
+const deleteCourse = (id) => {
+    if (confirm('Are you sure you want to delete this program? This action cannot be undone.')) {
+        useForm({}).delete(route('expert.courses.delete', id));
+    }
+};
+
+const toggleStatus = (course) => {
+    const newStatus = course.status === 'published' ? 'draft' : 'published';
+    useForm({
+        status: newStatus
+    }).patch(route('expert.courses.status.update', course.id), {
+        preserveScroll: true
     });
 };
 
@@ -146,6 +164,13 @@ const globalMetrics = computed(() => {
                     <div class="relative w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30">
                         <BookOpen class="w-8 h-8 text-white" />
                     </div>
+
+                    <div class="absolute top-4 left-4">
+                        <span :class="course.status === 'published' ? 'bg-emerald-500 text-white' : 'bg-white/90 text-slate-800'"
+                              class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow-sm border border-black/5">
+                            {{ course.status || 'Draft' }}
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Bottom Section: Course Info -->
@@ -180,9 +205,11 @@ const globalMetrics = computed(() => {
                     </div>
 
                     <!-- Bottom Actions -->
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">View Details</span>
-                        <ArrowRight class="w-4 h-4 text-indigo-600 group-hover:translate-x-1 transition-transform" />
+                    <div class="flex items-center justify-end text-sm">
+                        <div class="flex items-center gap-2 text-indigo-600 transition-transform group-hover:translate-x-1">
+                             <span class="text-[10px] font-black uppercase tracking-widest">Build</span>
+                             <ArrowRight class="w-4 h-4" />
+                        </div>
                     </div>
                 </div>
             </Link>

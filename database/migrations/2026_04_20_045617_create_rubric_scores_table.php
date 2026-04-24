@@ -8,14 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('rubric_scores', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('assignment_id')->constrained('evaluation_l3_assignments')->cascadeOnDelete();
-            $table->foreignId('rubric_template_id')->nullable()->constrained('rubric_templates')->nullOnDelete();
-            $table->json('details_json'); // New name
-            $table->integer('total_score')->default(0); 
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('rubric_scores')) {
+            Schema::create('rubric_scores', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('assignment_id')->constrained('evaluation_l3_assignments')->cascadeOnDelete();
+                $table->foreignId('rubric_template_id')->nullable()->constrained('rubric_templates')->nullOnDelete();
+                $table->json('details_json'); // New name
+                $table->integer('total_score')->default(0); 
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class CurriculumItem extends Model
+class QuizTemplate extends Model
 {
     use HasFactory;
 
@@ -13,11 +13,11 @@ class CurriculumItem extends Model
 
     protected $casts = [
         'content' => 'array',
-        'rubric_json' => 'array',
+        'passing_grade' => 'integer',
     ];
 
-    public function module()
+    public function expert()
     {
-        return $this->belongsTo(Module::class);
+        return $this->belongsTo(User::class, 'expert_id');
     }
 }

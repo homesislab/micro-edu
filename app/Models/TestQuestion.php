@@ -3,13 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-#[Fillable(['course_id', 'type', 'question_text', 'options', 'correct_key', 'order'])]
 class TestQuestion extends Model
 {
+    protected $fillable = [
+        'course_id',
+        'type',
+        'question_text',
+        'options',
+        'correct_key',
+        'order',
+        'weight',
+        'competency_tags',
+    ];
+
     protected $casts = [
-        'options' => 'array',
+        'options'          => 'array',
+        'competency_tags'  => 'array',
+        'weight'           => 'integer',
     ];
 
     public function course()
@@ -17,3 +28,4 @@ class TestQuestion extends Model
         return $this->belongsTo(Course::class);
     }
 }
+

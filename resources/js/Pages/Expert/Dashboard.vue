@@ -7,7 +7,7 @@ import {
     ShieldCheck, Search, ChevronRight, BookOpen,
     Settings, BarChart3, Download, Users, Award,
     TrendingUp, Key, Copy, CheckCircle2, X, Plus,
-    Sparkles, Loader2, LayoutGrid, Clock, Bell, Star
+    Sparkles, Loader2, LayoutGrid, Clock, Bell, Star, Trash2, Rocket
 } from 'lucide-vue-next';
 import ExpertReviewForm from '@/Components/Expert/ExpertReviewForm.vue';
 import Modal from '@/Components/Modal.vue';
@@ -76,6 +76,23 @@ const generateWithAI = async () => {
     } finally {
         isGeneratingAI.value = false;
     }
+};
+
+const deleteCourse = (id) => {
+    if (confirm('Are you sure you want to delete this program? This action cannot be undone.')) {
+        useForm({}).delete(route('expert.courses.delete', id), {
+            preserveScroll: true
+        });
+    }
+};
+
+const toggleStatus = (course) => {
+    const newStatus = course.status === 'published' ? 'draft' : 'published';
+    useForm({
+        status: newStatus
+    }).patch(route('expert.courses.status.update', course.id), {
+        preserveScroll: true
+    });
 };
 
 const expertStats = computed(() => {
@@ -393,7 +410,7 @@ const getAvatarColor = (id) => avatarColors[(id || 0) % avatarColors.length];
 
                             <div class="mt-auto">
                                 <Link :href="route('expert.courses.builder', course.id)"
-                                      class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-transparent border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors">
+                                      class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm">
                                     Manage Curriculum
                                 </Link>
                             </div>

@@ -52,28 +52,15 @@ class RubricController extends Controller
                 $enrollment = $assignment->enrollment;
                 $courseId = $enrollment->course_id;
 
-                // Calculate total required exercises for this program
-                $totalRequiredExercises = CourseMaterial::where('course_id', $courseId)
-                                            ->where('type', 'exercise')
-                                            ->count();
-
-                // Calculate total approved exercises for this participant
-                $totalApproved = EvaluationL3Assignment::where('enrollment_id', $enrollment->id)
-                                            ->where('status', 'approved')
-                                            ->count();
-
-                // If condition met: Unleash The Reward (Sertifikasi)
-                if ($totalApproved >= $totalRequiredExercises && $totalRequiredExercises > 0) {
-                    // Update enrollment status to completed
-                    $enrollment->update(['status' => 'completed']);
-
+                // Use the new Zero-Leak Gatekeeper logic (Pillar 5)
+                if ($enrollment->checkCertificateEligibility()) {
                     // Check if certificate already exists
                     $existingCert = UserCertificate::where('user_id', $enrollment->user_id)
                                         ->where('course_id', $courseId)
                                         ->first();
 
                     if (!$existingCert) {
-                        // Get default or specific template (Assuming default for now)
+                        // Get default or specific template
                         $template = CertificateTemplate::where('is_default', true)->first();
 
                         $cert = UserCertificate::create([

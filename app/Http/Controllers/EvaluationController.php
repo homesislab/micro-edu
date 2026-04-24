@@ -16,7 +16,7 @@ class EvaluationController extends Controller
     /**
      * Submit Pre-test or Post-test
      */
-    public function submitTest(Request $request, Enrollment $enrollment, string $type)
+    public function submitTest(Request $request, Enrollment $enrollment, \App\Models\CurriculumItem $curriculumItem, string $type)
     {
         $validated = $request->validate([
             'answers' => 'required|array',
@@ -44,14 +44,14 @@ class EvaluationController extends Controller
 
         $score = round(($correctCount / $questions->count()) * 100);
 
-        // Save evaluation record
+        // Save evaluation record with Item ID
         EvaluationL2Test::updateOrCreate(
-            ['enrollment_id' => $enrollment->id, 'type' => $type],
+            ['enrollment_id' => $enrollment->id, 'curriculum_item_id' => $curriculumItem->id, 'type' => $type],
             ['answers' => $validated['answers'], 'score' => $score]
         );
 
-        // Process the result using the logic inside the Enrollment model
-        $enrollment->processTestResult($type, $score);
+        // Aggregate Delta
+        $enrollment->calculateDelta();
 
         return back()->with('success', ucfirst($type) . ' submitted successfully!');
     }
@@ -84,7 +84,7 @@ class EvaluationController extends Controller
     /**
      * Submit L3 Assignment (Behavior)
      */
-    public function submitAssignment(Request $request, Enrollment $enrollment)
+    public function submitAssignment(Request $request, Enrollment $enrollment, \App\Models\CurriculumItem $curriculumItem)
     {
         $validated = $request->validate([
             'submission_type' => 'required|in:file,link',
@@ -100,6 +100,7 @@ class EvaluationController extends Controller
 
         $assignment = EvaluationL3Assignment::create([
             'enrollment_id' => $enrollment->id,
+            'curriculum_item_id' => $curriculumItem->id,
             'submission_type' => $validated['submission_type'],
             'file_path' => $filePath,
             'link_url' => $validated['link_url'] ?? null,

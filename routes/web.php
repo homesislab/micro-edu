@@ -98,9 +98,9 @@ Route::middleware(['auth'])->group(function () {
             return response()->json($course->testQuestions()->where('type', $type)->orderBy('order')->get());
         })->name('courses.questions');
 
-        Route::post('/enrollments/{enrollment}/test/{type}', [EvaluationController::class, 'submitTest'])->name('evaluation.submitTest');
+        Route::post('/enrollments/{enrollment}/test/{curriculumItem}/{type}', [EvaluationController::class, 'submitTest'])->name('evaluation.submitTest');
         Route::post('/enrollments/{enrollment}/feedback', [EvaluationController::class, 'submitFeedback'])->name('evaluation.submitFeedback');
-        Route::post('/enrollments/{enrollment}/assignment', [EvaluationController::class, 'submitAssignment'])->name('evaluation.submitAssignment');
+        Route::post('/enrollments/{enrollment}/assignment/{curriculumItem}', [EvaluationController::class, 'submitAssignment'])->name('evaluation.submitAssignment');
         Route::post('/enrollments/{enrollment}/claim-attendance', [EvaluationController::class, 'claimAttendance'])->name('evaluation.claimAttendance');
         Route::post('/enrollments/{enrollment}/fast-track', [EvaluationController::class, 'fastTrack'])->name('evaluation.fastTrack');
 
@@ -140,25 +140,35 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/courses/{course}/builder', [ExpertController::class, 'courseBuilder'])->name('expert.courses.builder');
             Route::get('/courses/{course}/report', [ExpertController::class, 'downloadReport'])->name('expert.courses.report');
             Route::post('/courses', [ExpertController::class, 'store'])->name('expert.courses.store');
+            Route::delete('/courses/{course}', [ExpertController::class, 'deleteCourse'])->name('expert.courses.delete');
+            Route::patch('/courses/{course}/status', [ExpertController::class, 'updateStatus'])->name('expert.courses.status.update');
             Route::post('/expert/ai/generate-program', [AIController::class, 'generateProgram'])->name('expert.ai.generate-program');
             Route::post('/expert/ai/generate-curriculum/{course}', [AIController::class, 'generateCurriculum'])->name('expert.ai.generate-curriculum');
             Route::post('/expert/ai/generate-questions/{course}', [AIController::class, 'generateQuestions'])->name('expert.ai.generate-questions');
+            Route::post('/expert/ai/generate-quiz-template', [AIController::class, 'generateQuizTemplate'])->name('expert.ai.generate-quiz-template');
+            
+            // Competency Analytics
+            Route::get('/courses/{course}/competency-analytics', [ExpertController::class, 'getCompetencyAnalytics'])->name('expert.quiz.competency-analytics');
+            
+            // Quiz Bank
+            Route::get('/quiz-bank', [ExpertController::class, 'quizBank'])->name('expert.quiz-bank.index');
+            Route::post('/quiz-bank', [ExpertController::class, 'storeQuizTemplate'])->name('expert.quiz-bank.store');
+            Route::patch('/quiz-bank/{template}', [ExpertController::class, 'updateQuizTemplate'])->name('expert.quiz-bank.update');
+            Route::delete('/quiz-bank/{template}', [ExpertController::class, 'deleteQuizTemplate'])->name('expert.quiz-bank.delete');
+            Route::get('/api/quiz-bank', [ExpertController::class, 'getQuizBank'])->name('expert.quiz-bank.api');
+            
+            // Rubric Library
+            Route::get('/rubric-bank', [ExpertController::class, 'rubricBank'])->name('expert.rubric-bank.index');
+            Route::post('/rubric-bank', [ExpertController::class, 'storeRubricTemplate'])->name('expert.rubric-bank.store');
+            Route::patch('/rubric-bank/{template}', [ExpertController::class, 'updateRubricTemplate'])->name('expert.rubric-bank.update');
+            Route::delete('/rubric-bank/{template}', [ExpertController::class, 'deleteRubricTemplate'])->name('expert.rubric-bank.delete');
+            Route::get('/api/rubric-bank', [ExpertController::class, 'rubricBankApi'])->name('expert.rubric-bank.api');
             
             Route::post('/courses/{course}/flyer', [ExpertController::class, 'generateFlyer'])->name('expert.courses.flyer');
             Route::patch('/courses/{course}/settings', [ExpertController::class, 'updateSettings'])->name('expert.courses.settings');
             Route::post('/courses/{course}/materials', [ExpertController::class, 'storeMaterial'])->name('expert.materials.store');
             Route::patch('/materials/{material}', [ExpertController::class, 'updateMaterial'])->name('expert.materials.update');
             Route::delete('/materials/{material}', [ExpertController::class, 'deleteMaterial'])->name('expert.materials.delete');
-
-            // Module Routes
-            Route::post('/courses/{course}/modules', [ExpertController::class, 'storeModule'])->name('expert.modules.store');
-            Route::patch('/modules/{module}', [ExpertController::class, 'updateModule'])->name('expert.modules.update');
-            Route::delete('/modules/{module}', [ExpertController::class, 'deleteModule'])->name('expert.modules.delete');
-
-            // Item Routes
-            Route::post('/courses/{course}/items', [ExpertController::class, 'storeItem'])->name('expert.items.store');
-            Route::patch('/items/{item}', [ExpertController::class, 'updateItem'])->name('expert.items.update');
-            Route::delete('/items/{item}', [ExpertController::class, 'deleteItem'])->name('expert.items.delete');
             Route::post('/courses/{course}/questions', [ExpertController::class, 'storeQuestion'])->name('expert.questions.store');
             Route::patch('/questions/{question}', [ExpertController::class, 'updateQuestion'])->name('expert.questions.update');
             Route::delete('/questions/{question}', [ExpertController::class, 'deleteQuestion'])->name('expert.questions.delete');
@@ -171,6 +181,16 @@ Route::middleware(['auth'])->group(function () {
                 'update' => 'expert.blogs.update',
                 'destroy' => 'expert.blogs.destroy',
             ]);
+            
+            // Architect Studio: Modules
+            Route::post('/courses/{course}/modules', [ExpertController::class, 'storeModule'])->name('expert.modules.store');
+            Route::patch('/modules/{module}', [ExpertController::class, 'updateModule'])->name('expert.modules.update');
+            Route::delete('/modules/{module}', [ExpertController::class, 'deleteModule'])->name('expert.modules.delete');
+
+            // Architect Studio: Items
+            Route::post('/courses/{course}/items', [ExpertController::class, 'storeItem'])->name('expert.items.store');
+            Route::patch('/items/{item}', [ExpertController::class, 'updateItem'])->name('expert.items.update');
+            Route::delete('/items/{item}', [ExpertController::class, 'deleteItem'])->name('expert.items.delete');
         });
     });
 });

@@ -14,7 +14,10 @@ import {
     ChevronRight,
     Search,
     Rocket,
-    BarChart3
+    BarChart3,
+    Target,
+    LayoutPanelLeft,
+    CheckCircle2
 } from 'lucide-vue-next';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -66,14 +69,31 @@ const topNavItems = computed(() => {
                 href: route('dashboard'),
                 icon: LayoutDashboard,
                 active: url.includes('/dashboard') && !url.includes('/expert')
-            },
-            {
-                name: 'Review Queue',
-                href: route('expert.dashboard'),
-                icon: ClipboardCheck,
-                active: url.includes('/expert/dashboard') || url.includes('/expert/review-queue')
-            },
+            }
         );
+        
+        if (user.value.role === 'expert') {
+            items.push(
+                {
+                    name: 'Review Queue',
+                    href: route('expert.dashboard'),
+                    icon: ClipboardCheck,
+                    active: url.includes('/expert/dashboard') || url.includes('/expert/review-queue')
+                },
+                {
+                    name: 'Quiz Bank',
+                    href: route('expert.quiz-bank.index'),
+                    icon: Target,
+                    active: url.includes('/expert/quiz-bank')
+                },
+                {
+                    name: 'Rubric Library',
+                    href: route('expert.rubric-bank.index'),
+                    icon: CheckCircle2,
+                    active: url.includes('/expert/rubric-bank')
+                }
+            );
+        }
     }
 
     return items;
@@ -82,7 +102,7 @@ const topNavItems = computed(() => {
 const bottomNavItems = computed(() => {
     const items = [];
 
-    if (academy.value) {
+    if (academy.value && (user.value.role === 'fulfillment' || user.value.role === 'admin')) {
         items.push(
             { name: 'Settings', href: route('academy.settings'), icon: Settings, active: route().current('academy.settings') }
         );

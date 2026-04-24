@@ -34,41 +34,93 @@ class Enrollment extends Model
         return $this->hasMany(EvaluationL2Test::class);
     }
 
-    public function l3Assignment()
+    public function l3Assignments()
     {
-        return $this->hasOne(EvaluationL3Assignment::class);
+        return $this->hasMany(EvaluationL3Assignment::class);
     }
 
     /**
-     * Processes the result of a pre-test or post-test and updates the enrollment status.
-     *
-     * @param string $type The type of the test ('pretest' or 'posttest').
-     * @param int $score The calculated score.
-     * @return void
+     * Aggregates L2 performance from item-level tests.
      */
-    public function processTestResult(string $type, int $score): void
+    public function calculateDelta()
     {
-        if ($type === 'pretest') {
-            $isFirstTime = $this->status === 'enrolled';
-            $this->update([
-                'pretest_score' => $score,
-                'status' => 'pre_test_done',
-                'points' => $isFirstTime ? ($this->points ?? 0) + 10 : ($this->points ?? 0)
-            ]);
-        } 
+        $tests = $this->l2Tests()->get();
+        if ($tests->isEmpty()) return;
+
+        // Group by curriculum item to find pre/post pairs
+        $grouped = $tests->groupBy('curriculum_item_id');
         
-        if ($type === 'posttest') {
-            $isFirstTime = $this->status === 'l1_done' || $this->status === 'attended';
-            $delta = $score - ($this->pretest_score ?? 0);
-            $passed = $score >= $this->course->passing_grade;
+        $preSum = 0;
+        $postSum = 0;
+        $pairsCount = 0;
+
+        foreach ($grouped as $itemId => $itemTests) {
+            $pre = $itemTests->where('type', 'pre_test')->first();
+            $post = $itemTests->where('type', 'final_exam')->first();
+
+            if ($pre && $post) {
+                $preSum += $pre->score;
+                $postSum += $post->score;
+                $pairsCount++;
+            }
+        }
+
+        if ($pairsCount > 0) {
+            $avgPre = $preSum / $pairsCount;
+            $avgPost = $postSum / $pairsCount;
             
             $this->update([
-                'posttest_score' => $score,
-                'score_delta' => $delta,
-                'certificate_unlocked' => $passed,
-                'status' => 'post_test_done',
-                'points' => $isFirstTime ? ($this->points ?? 0) + 50 : ($this->points ?? 0)
+                'pretest_score' => round($avgPre),
+                'posttest_score' => round($avgPost),
+                'score_delta' => round($avgPost - $avgPre)
             ]);
         }
+    }
+
+    /**
+     * Strictly validates all L2 and L3 requirements.
+     */
+    public function checkCertificateEligibility(): bool
+    {
+        // 1. Check L2 Mastery (Knowledge items marked as mastery)
+        $masteryItems = $this->course->modules()
+            ->with('items')
+            ->get()
+            ->flatMap->items
+            ->where('type', 'knowledge')
+            ->where('assessment_mode', 'mastery');
+
+        foreach ($masteryItems as $item) {
+            $bestScore = $this->l2Tests()
+                ->where('curriculum_item_id', $item->id)
+                ->where('type', 'final_exam')
+                ->max('score');
+
+            if (!$bestScore || $bestScore < $this->course->passing_grade) {
+                return false;
+            }
+        }
+
+        // 2. Check L3 Behavior (Exercise items)
+        $exerciseItems = $this->course->modules()
+            ->with('items')
+            ->get()
+            ->flatMap->items
+            ->where('type', 'exercise');
+
+        foreach ($exerciseItems as $item) {
+            $isApproved = $this->l3Assignments()
+                ->where('curriculum_item_id', $item->id)
+                ->where('status', 'approved')
+                ->exists();
+
+            if (!$isApproved) {
+                return false;
+            }
+        }
+
+        // If we reach here, all gates are passed
+        $this->update(['certificate_unlocked' => true, 'status' => 'completed']);
+        return true;
     }
 }

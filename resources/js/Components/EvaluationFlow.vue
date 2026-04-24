@@ -25,6 +25,7 @@ import {
 
 const props = defineProps({
     enrollment: Object,
+    item: Object,
 });
 
 const questions = ref([]);
@@ -83,7 +84,7 @@ const fetchQuestions = async (type) => {
 };
 
 const submitTest = (type) => {
-    testForm.post(route('evaluation.submitTest', { enrollment: props.enrollment.id, type }), {
+    testForm.post(route('evaluation.submitTest', { enrollment: props.enrollment.id, curriculumItem: props.item.id, type }), {
         onSuccess: () => {
             questions.value = [];
             testForm.reset();
@@ -96,7 +97,7 @@ const submitFeedback = () => {
 };
 
 const submitAssignment = () => {
-    assignmentForm.post(route('evaluation.submitAssignment', props.enrollment.id));
+    assignmentForm.post(route('evaluation.submitAssignment', { enrollment: props.enrollment.id, curriculumItem: props.item.id }));
 };
 
 const submitAttendance = () => {

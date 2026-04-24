@@ -8,6 +8,7 @@ use App\Models\CourseMaterial;
 use App\Models\Module;
 use App\Models\CurriculumItem;
 use App\Models\EvaluationL3Assignment;
+use App\Models\QuizTemplate;
 use App\Models\TestQuestion;
 use App\Models\RubricTemplate;
 use App\Models\UserCertificate;
@@ -141,7 +142,7 @@ class ExpertController extends Controller
         $expert = auth()->user();
         
         // Get all pending assignments for this expert (across all their courses)
-        $assignments = EvaluationL3Assignment::with(['enrollment.user', 'enrollment.course'])
+        $assignments = EvaluationL3Assignment::with(['enrollment.user', 'enrollment.course', 'curriculumItem'])
             ->where('status', 'pending')
             ->whereHas('enrollment.course', function ($query) {
                 $query->where('expert_id', auth()->id());
@@ -177,6 +178,24 @@ class ExpertController extends Controller
 
         return redirect()->route('expert.courses.builder', $course->id)
             ->with('success', 'Program designed successfully! Start building your curriculum.');
+    }
+
+    public function deleteCourse(Course $course)
+    {
+        $this->assertCourseOwner($course);
+        $course->delete();
+        return back()->with('success', 'Program deleted successfully.');
+    }
+
+    public function updateStatus(Request $request, Course $course)
+    {
+        $this->assertCourseOwner($course);
+        $validated = $request->validate([
+            'status' => 'required|string|in:draft,published,archived'
+        ]);
+
+        $course->update(['status' => $validated['status']]);
+        return back()->with('success', 'Program status updated to ' . $validated['status']);
     }
 
     protected function assertCourseOwner(Course $course)
@@ -301,23 +320,36 @@ class ExpertController extends Controller
             'module_id' => 'required|exists:modules,id',
             'title' => 'required|string|max:255',
             'type' => 'required|in:literal,visual,knowledge,exercise',
+            'sub_type' => 'nullable|string|max:50',
             'content' => 'nullable|string',
+            'assessment_mode' => 'nullable|string|in:diagnostic,mastery',
+            'passing_grade' => 'nullable|integer|min:0|max:100',
             'is_capstone' => 'boolean',
             'rubric_json' => 'nullable|array',
             'order' => 'nullable|integer'
         ]);
 
+        $rawContent = $request->input('content');
+        // If it's already a JSON string (quiz settings), decode it. Otherwise wrap as array.
+        $contentValue = null;
+        if ($rawContent) {
+            $decoded = json_decode($rawContent, true);
+            $contentValue = (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
+                ? $decoded
+                : ['body' => $rawContent];
+        }
+
         CurriculumItem::create([
-            'module_id' => $request->module_id,
-            'title' => $request->title,
-            'type' => $request->type,
-            'content_json' => [
-                'body' => $request->content,
-                'description' => $request->content // compatible with legacy
-            ],
-            'is_capstone' => $request->is_capstone ?? false,
-            'rubric_json' => $request->rubric_json,
-            'order' => $request->order ?? 0,
+            'module_id' => $request->input('module_id'),
+            'title' => $request->input('title'),
+            'type' => $request->input('type'),
+            'sub_type' => $request->input('sub_type'),
+            'assessment_mode' => $request->input('assessment_mode') ?? 'diagnostic',
+            'passing_grade' => $request->input('passing_grade'),
+            'content' => $contentValue,
+            'is_capstone' => $request->input('is_capstone') ?? false,
+            'rubric_json' => $request->input('rubric_json'),
+            'order' => $request->input('order') ?? 0,
         ]);
 
         return back();
@@ -332,20 +364,32 @@ class ExpertController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'required|in:literal,visual,knowledge,exercise',
+            'sub_type' => 'nullable|string|max:50',
             'content' => 'nullable|string',
+            'assessment_mode' => 'nullable|string|in:diagnostic,mastery',
+            'passing_grade' => 'nullable|integer|min:0|max:100',
             'is_capstone' => 'boolean',
             'rubric_json' => 'nullable|array',
         ]);
 
+        $rawContent = $request->input('content');
+        $contentValue = null;
+        if ($rawContent) {
+            $decoded = json_decode($rawContent, true);
+            $contentValue = (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
+                ? $decoded
+                : ['body' => $rawContent];
+        }
+
         $item->update([
-            'title' => $request->title,
-            'type' => $request->type,
-            'content_json' => [
-                'body' => $request->content,
-                'description' => $request->content
-            ],
-            'is_capstone' => $request->is_capstone ?? false,
-            'rubric_json' => $request->rubric_json,
+            'title' => $request->input('title'),
+            'type' => $request->input('type'),
+            'sub_type' => $request->input('sub_type'),
+            'assessment_mode' => $request->input('assessment_mode') ?? 'diagnostic',
+            'passing_grade' => $request->input('passing_grade'),
+            'content' => $contentValue,
+            'is_capstone' => $request->input('is_capstone') ?? false,
+            'rubric_json' => $request->input('rubric_json'),
         ]);
 
         return back();
@@ -367,18 +411,22 @@ class ExpertController extends Controller
 
         $request->validate([
             'question_text' => 'required|string',
-            'type' => 'required|in:pretest,posttest',
-            'options' => 'required|array',
-            'correct_answer' => 'required|string',
-            'order' => 'nullable|integer|min:0',
+            'type'          => 'required|in:pretest,posttest',
+            'options'       => 'required|array',
+            'correct_answer'=> 'required|string',
+            'order'         => 'nullable|integer|min:0',
+            'weight'        => 'nullable|integer|min:1|max:20',
+            'competency_tags' => 'nullable|array',
         ]);
 
         $course->testQuestions()->create([
-            'question_text' => $request->question_text,
-            'type' => $request->type,
-            'options' => $request->options,
-            'correct_key' => $request->correct_answer,
-            'order' => $request->order,
+            'question_text'   => $request->question_text,
+            'type'            => $request->type,
+            'options'         => $request->options,
+            'correct_key'     => $request->correct_answer,
+            'order'           => $request->order,
+            'weight'          => $request->weight ?? 1,
+            'competency_tags' => $request->competency_tags ?? [],
         ]);
 
         return back();
@@ -392,18 +440,22 @@ class ExpertController extends Controller
 
         $request->validate([
             'question_text' => 'required|string',
-            'type' => 'required|in:pretest,posttest',
-            'options' => 'required|array',
-            'correct_answer' => 'required|string',
-            'order' => 'nullable|integer|min:0',
+            'type'          => 'required|in:pretest,posttest',
+            'options'       => 'required|array',
+            'correct_answer'=> 'required|string',
+            'order'         => 'nullable|integer|min:0',
+            'weight'        => 'nullable|integer|min:1|max:20',
+            'competency_tags' => 'nullable|array',
         ]);
 
         $question->update([
-            'question_text' => $request->question_text,
-            'type' => $request->type,
-            'options' => $request->options,
-            'correct_key' => $request->correct_answer,
-            'order' => $request->order,
+            'question_text'   => $request->question_text,
+            'type'            => $request->type,
+            'options'         => $request->options,
+            'correct_key'     => $request->correct_answer,
+            'order'           => $request->order,
+            'weight'          => $request->weight ?? $question->weight,
+            'competency_tags' => $request->competency_tags ?? $question->competency_tags,
         ]);
 
         return back();
@@ -499,12 +551,215 @@ class ExpertController extends Controller
         
         $courses = Course::where('expert_id', $expert->id)
             ->withCount('enrollments')
-            ->with(['enrollments.user', 'enrollments.l1Feedback'])
+            ->with([
+                'enrollments.user', 
+                'enrollments.l1Feedback', 
+                'enrollments.l2Tests.curriculumItem', 
+                'enrollments.l3Assignments.curriculumItem'
+            ])
             ->get();
 
         return Inertia::render('Expert/Analytics', [
             'courses' => $courses,
             'selectedCourseId' => $request->query('course_id')
         ]);
+    }
+
+    // --- QUIZ BANK ---
+
+    public function quizBank()
+    {
+        $expert = auth()->user();
+        $templates = QuizTemplate::where('expert_id', $expert->id)->latest()->get();
+
+        return Inertia::render('Expert/QuizBank/Index', [
+            'templates' => $templates
+        ]);
+    }
+
+    public function storeQuizTemplate(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'sub_type' => 'required|in:pre_test,quiz,final_exam',
+            'assessment_mode' => 'required|in:diagnostic,mastery',
+            'passing_grade' => 'nullable|integer|min:0|max:100',
+            'content' => 'nullable|array'
+        ]);
+
+        QuizTemplate::create([
+            'expert_id' => auth()->id(),
+            'title' => $request->input('title'),
+            'sub_type' => $request->input('sub_type'),
+            'assessment_mode' => $request->input('assessment_mode'),
+            'passing_grade' => $request->input('passing_grade'),
+            'content' => $request->input('content') ?? []
+        ]);
+
+        return back();
+    }
+
+    public function updateQuizTemplate(Request $request, QuizTemplate $template)
+    {
+        if ($template->expert_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'sub_type' => 'required|in:pre_test,quiz,final_exam',
+            'assessment_mode' => 'required|in:diagnostic,mastery',
+            'passing_grade' => 'nullable|integer|min:0|max:100',
+            'content' => 'nullable|array'
+        ]);
+
+        $template->update($request->only(['title', 'sub_type', 'assessment_mode', 'passing_grade', 'content']));
+
+        return back();
+    }
+
+    public function deleteQuizTemplate(QuizTemplate $template)
+    {
+        if ($template->expert_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $template->delete();
+        return back();
+    }
+
+    public function getQuizBank()
+    {
+        return response()->json(
+            QuizTemplate::where('expert_id', auth()->id())->latest()->get()
+        );
+    }
+
+    // --- Rubric Bank Methods ---
+
+    public function rubricBank()
+    {
+        $templates = RubricTemplate::where('expert_id', auth()->id())
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Expert/RubricBank/Index', [
+            'templates' => $templates
+        ]);
+    }
+
+    public function storeRubricTemplate(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'criteria_json' => 'required|array',
+            'is_default' => 'boolean'
+        ]);
+
+        RubricTemplate::create([
+            'expert_id' => auth()->id(),
+            'name' => $request->name,
+            'criteria_json' => $request->criteria_json,
+            'is_default' => $request->is_default ?? false,
+        ]);
+
+        return back()->with('success', 'Rubric template added to library!');
+    }
+
+    public function updateRubricTemplate(Request $request, RubricTemplate $template)
+    {
+        $this->assertCourseOwner($template->expert_id); // Reusing ownership logic
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'criteria_json' => 'required|array',
+            'is_default' => 'boolean'
+        ]);
+
+        $template->update($request->only('name', 'criteria_json', 'is_default'));
+
+        return back()->with('success', 'Rubric template updated!');
+    }
+
+    public function deleteRubricTemplate(RubricTemplate $template)
+    {
+        $this->assertCourseOwner($template->expert_id);
+        $template->delete();
+        return back()->with('success', 'Rubric template removed from library.');
+    }
+
+    public function rubricBankApi()
+    {
+        return response()->json(
+            RubricTemplate::where('expert_id', auth()->id())->orderBy('name')->get()
+        );
+    }
+
+    // --- QUIZ ENGINE: Competency Analytics ---
+
+    /**
+     * Aggregate enrollments' quiz results per competency tag.
+     * Returns: [ tag => [ total_points, earned_points, pct ] ]
+     */
+    public function getCompetencyAnalytics(Course $course)
+    {
+        $this->assertCourseOwner($course);
+
+        $questions = $course->testQuestions()->whereNotNull('competency_tags')->get();
+
+        if ($questions->isEmpty()) {
+            return response()->json(['tags' => [], 'difficulty' => []]);
+        }
+
+        // Build difficulty index — questions answered wrong most often
+        // (Placeholder structure; real data requires quiz_attempts table)
+        $difficulty = $questions->map(fn($q) => [
+            'id'          => $q->id,
+            'text'        => Str::limit($q->question_text, 60),
+            'weight'      => $q->weight,
+            'tags'        => $q->competency_tags ?? [],
+            'wrong_rate'  => 0, // Will be populated from quiz_attempts when available
+        ])->values();
+
+        // Aggregate points available per competency tag
+        $tagTotals = [];
+        foreach ($questions as $q) {
+            foreach (($q->competency_tags ?? []) as $tag) {
+                if (!isset($tagTotals[$tag])) {
+                    $tagTotals[$tag] = ['total_weight' => 0, 'question_count' => 0];
+                }
+                $tagTotals[$tag]['total_weight']   += $q->weight;
+                $tagTotals[$tag]['question_count'] += 1;
+            }
+        }
+
+        return response()->json([
+            'tags'       => $tagTotals,
+            'difficulty' => $difficulty,
+        ]);
+    }
+
+    /**
+     * Calculate weighted score for a set of answers.
+     * $answers = [ question_id => selected_key ]
+     * Returns: [ raw_score, total_weight, percentage ]
+     */
+    public static function calculateWeightedScore(array $answers, $questions): array
+    {
+        $earned = 0;
+        $total  = 0;
+
+        foreach ($questions as $q) {
+            $total += $q->weight;
+            if (isset($answers[$q->id]) && $answers[$q->id] === $q->correct_key) {
+                $earned += $q->weight;
+            }
+        }
+
+        return [
+            'earned'     => $earned,
+            'total'      => $total,
+            'percentage' => $total > 0 ? round(($earned / $total) * 100, 1) : 0,
+        ];
     }
 }

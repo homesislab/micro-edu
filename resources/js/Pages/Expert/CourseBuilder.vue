@@ -22,7 +22,8 @@ import {
     Copy,
     Check as CheckIcon,
     Sparkles,
-    Loader2
+    Loader2,
+    Rocket
 } from 'lucide-vue-next';
 import ArchitectStudio from '@/Components/Expert/ArchitectStudio.vue';
 
@@ -57,6 +58,8 @@ const questionForm = useForm({
         { key: 'd', text: '' },
     ],
     correct_answer: 'a',
+    weight: 1,
+    competency_tags: [],
 });
 
 const settingsForm = useForm({
@@ -104,8 +107,12 @@ const openQuestionModal = (question = null) => {
         questionForm.type = question.type;
         questionForm.options = question.options;
         questionForm.correct_answer = question.correct_answer ?? question.correct_key;
+        questionForm.weight = question.weight ?? 1;
+        questionForm.competency_tags = question.competency_tags ?? [];
     } else {
         questionForm.reset();
+        questionForm.weight = 1;
+        questionForm.competency_tags = [];
     }
     showQuestionModal.value = true;
 };
@@ -183,6 +190,14 @@ const generateQuestionsAI = () => {
         preserveScroll: true,
     });
 };
+const toggleStatus = () => {
+    const newStatus = props.course.status === 'published' ? 'draft' : 'published';
+    useForm({
+        status: newStatus
+    }).patch(route('expert.courses.status.update', props.course.id), {
+        preserveScroll: true
+    });
+};
 </script>
 
 <template>
@@ -215,11 +230,6 @@ const generateQuestionsAI = () => {
                         class="px-8 py-3 rounded-2xl font-black text-xs transition-all flex items-center gap-2">
                     <BookOpen class="w-4 h-4" /> Curriculum
                 </button>
-                <button @click="activeTab = 'assessment'" 
-                        :class="activeTab === 'assessment' ? 'bg-white text-indigo-700 shadow-md ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-900'"
-                        class="px-8 py-3 rounded-2xl font-black text-xs transition-all flex items-center gap-2">
-                    <HelpCircle class="w-4 h-4" /> Knowledge Bank
-                </button>
                 <button @click="activeTab = 'settings'" 
                         :class="activeTab === 'settings' ? 'bg-white text-indigo-700 shadow-md ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-900'"
                         class="px-8 py-3 rounded-2xl font-black text-xs transition-all flex items-center gap-2">
@@ -234,78 +244,6 @@ const generateQuestionsAI = () => {
                     :is-generating="isGeneratingCurriculum"
                     @generate-ai="generateCurriculumAI"
                 />
-            </div>
-
-            <!-- Tab Content: Knowledge Bank -->
-            <div v-if="activeTab === 'assessment'" class="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
-                <div class="flex items-end justify-between px-2">
-                    <div>
-                        <h3 class="text-2xl font-black text-slate-900 tracking-tight">Competency Metrics</h3>
-                        <p class="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Calibrate diagnostic and mastery assessments</p>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button @click="generateQuestionsAI" 
-                                :disabled="isGeneratingQuestions"
-                                class="bg-amber-50 text-amber-700 px-6 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-3 border border-amber-100 hover:bg-amber-500 hover:text-white transition-all disabled:opacity-50">
-                            <component :is="isGeneratingQuestions ? Loader2 : Sparkles" :class="{ 'animate-spin': isGeneratingQuestions }" class="w-4 h-4" />
-                            {{ isGeneratingQuestions ? 'Forging Bank...' : 'AI Forge' }}
-                        </button>
-                        <button @click="openQuestionModal()" 
-                                class="bg-slate-900 text-white px-8 py-4 rounded-[2rem] font-black text-sm flex items-center gap-3 shadow-2xl hover:bg-indigo-600 transition-all hover:-translate-y-1 active:scale-95">
-                            <Plus class="w-5 h-5 text-indigo-400" /> Forge Question
-                        </button>
-                    </div>
-                </div>
-
-                <div v-if="!course.test_questions || course.test_questions.length === 0" class="bg-white p-24 rounded-[4rem] border-2 border-dashed border-slate-100 text-center relative overflow-hidden group">
-                    <div class="bg-white w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-2xl border border-slate-50">
-                        <HelpCircle class="text-slate-200 w-10 h-10" />
-                    </div>
-                    <p class="text-slate-900 font-black text-2xl tracking-tight">Knowledge Bank is empty.</p>
-                    <p class="text-slate-400 font-medium max-w-xs mx-auto mt-3">Ready to measure performance? Add your first competency verification question.</p>
-                </div>
-
-                <div class="grid grid-cols-1 gap-6">
-                    <div v-for="q in course.test_questions" :key="q.id" 
-                         class="bg-white rounded-[3rem] border border-slate-100 overflow-hidden group transition-all hover:border-indigo-100 hover:shadow-2xl">
-                        <div class="p-8 flex items-start justify-between">
-                            <div class="flex gap-6">
-                                <div :class="q.type === 'pretest' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'"
-                                      class="px-4 py-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border flex flex-col items-center justify-center min-w-[100px] shadow-sm">
-                                    <span class="opacity-40 mb-1">Phase</span>
-                                    <span class="text-xs">{{ q.type === 'pretest' ? 'Diag' : 'Mast' }}</span>
-                                </div>
-                                <div class="pt-2">
-                                    <p class="font-black text-slate-900 text-xl leading-snug group-hover:text-indigo-900 transition-colors">{{ q.question_text }}</p>
-                                    <div class="flex items-center gap-4 mt-4">
-                                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ q.options.length }} Strategic Options</span>
-                                        <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-                                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Correct: {{ (q.correct_key || q.correct_answer).toUpperCase() }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 translate-y-1">
-                                <button @click="openQuestionModal(q)" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all">
-                                    <Edit2 class="w-4 h-4" />
-                                </button>
-                                <button @click="deleteQuestion(q.id)" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all">
-                                    <Trash2 class="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                        <div class="bg-slate-50/50 px-10 py-6 grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-slate-100/50">
-                            <div v-for="opt in q.options" :key="opt.key" 
-                                 :class="(q.correct_key || q.correct_answer) === opt.key ? 'text-emerald-600 bg-white border-emerald-100 shadow-sm' : 'text-slate-400 border-transparent'"
-                                 class="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider border transition-all">
-                                <div :class="(q.correct_key || q.correct_answer) === opt.key ? 'bg-emerald-500 scale-110' : 'bg-slate-100'" class="w-4 h-4 rounded-full flex items-center justify-center transition-all">
-                                    <CheckCircle2 v-if="(q.correct_key || q.correct_answer) === opt.key" class="w-3 h-3 text-white" />
-                                    <Circle v-else class="w-3 h-3 text-slate-100" />
-                                </div>
-                                {{ opt.text }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Tab Content: Parameters -->
@@ -384,6 +322,44 @@ const generateQuestionsAI = () => {
                             </button>
                         </div>
                     </form>
+
+                    <!-- Program Lifecycle Section -->
+                    <div class="relative z-10 pt-16 border-t border-slate-50">
+                        <h3 class="text-2xl font-black text-slate-900 tracking-tight mb-8">Program Lifecycle</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Status Control -->
+                            <div class="bg-slate-50 rounded-3xl p-8 border border-slate-100 flex flex-col justify-between">
+                                <div>
+                                    <h4 class="text-sm font-black text-slate-900 uppercase tracking-widest mb-2">Visibility Status</h4>
+                                    <p class="text-xs text-slate-500 font-medium leading-relaxed">
+                                        Current status: <span :class="course.status === 'published' ? 'text-emerald-600' : 'text-amber-600'" class="font-bold font-black capitalize">{{ course.status || 'Draft' }}</span>.
+                                        {{ course.status === 'published' ? 'Your program is live and visible to registered students.' : 'Your program is currently in design mode and hidden from the catalog.' }}
+                                    </p>
+                                </div>
+                                <button @click="toggleStatus" 
+                                        :class="course.status === 'published' ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100'"
+                                        class="mt-6 w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 border-2 border-transparent">
+                                    <Rocket v-if="course.status !== 'published'" class="w-4 h-4" />
+                                    <Clock v-else class="w-4 h-4" />
+                                    {{ course.status === 'published' ? 'Set to Draft (Unpublish)' : 'Publish to Catalog' }}
+                                </button>
+                            </div>
+
+                            <!-- Danger Zone -->
+                            <div class="bg-rose-50/30 rounded-3xl p-8 border border-rose-100 flex flex-col justify-between">
+                                <div>
+                                    <h4 class="text-sm font-black text-rose-900 uppercase tracking-widest mb-2">Danger Zone</h4>
+                                    <p class="text-xs text-rose-600 font-medium leading-relaxed opacity-70">
+                                        Permanently delete this program, including all modules, quizzes, and participant records. This action cannot be reversed.
+                                    </p>
+                                </div>
+                                <button @click="router.delete(route('expert.courses.delete', course.id))" 
+                                        class="mt-6 w-full py-4 rounded-2xl font-black text-sm text-rose-600 border-2 border-rose-200 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-3">
+                                    <Trash2 class="w-4 h-4" /> Terminate Program
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -480,13 +456,18 @@ const generateQuestionsAI = () => {
                                         <option value="posttest">Mastery (Post)</option>
                                     </select>
                                 </div>
-
-                                <div class="bg-indigo-900 rounded-3xl p-6 text-indigo-100 space-y-3 shadow-2xl">
-                                    <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                                        <HelpCircle class="w-5 h-5" />
+                                <div class="space-y-3">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Score Weight</label>
+                                    <input v-model.number="questionForm.weight" type="number" min="1" max="20" class="w-full px-6 py-4 rounded-xl bg-white border-none focus:ring-4 focus:ring-indigo-100 transition-all font-black text-xs outline-none shadow-sm" />
+                                </div>
+                                <div class="space-y-3">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Competency Tags</label>
+                                    <div class="flex flex-col gap-2">
+                                        <label v-for="tag in ['Technical Skill', 'Conceptual', 'Safety', 'Communication', 'Leadership', 'Problem Solving']" :key="tag" class="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors">
+                                            <input type="checkbox" :value="tag" v-model="questionForm.competency_tags" class="text-indigo-600 focus:ring-indigo-500 rounded" />
+                                            <span class="text-xs font-bold text-slate-700">{{ tag }}</span>
+                                        </label>
                                     </div>
-                                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Architect Wisdom</p>
-                                    <p class="text-xs font-medium leading-relaxed">Ensure pre and post questions correlate to validly measure growth delta.</p>
                                 </div>
                             </div>
 

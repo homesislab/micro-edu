@@ -10,7 +10,12 @@ import {
     TrendingUp,
     Award,
     Sparkles,
-    ArrowLeft
+    ArrowLeft,
+    Clock,
+    CheckCircle2,
+    Target,
+    FileText,
+    ExternalLink
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -19,6 +24,13 @@ const props = defineProps({
 });
 
 const selectedTrackerCourse = ref(null);
+const selectedEnrollment = ref(null);
+const showDetailSlideOver = ref(false);
+
+const openDetail = (enrollment) => {
+    selectedEnrollment.value = enrollment;
+    showDetailSlideOver.value = true;
+};
 
 onMounted(() => {
     if (props.selectedCourseId) {
@@ -164,7 +176,8 @@ const getInitials = (name) => {
                                             </td>
                                         </tr>
                                         <tr v-for="enrollment in selectedTrackerCourse?.enrollments" :key="enrollment.id"
-                                            class="group hover:bg-slate-50/50 transition-colors">
+                                            @click="openDetail(enrollment)"
+                                            class="group hover:bg-slate-50/50 transition-colors cursor-pointer">
                                             <td class="px-10 py-8">
                                                 <div class="flex items-center gap-4">
                                                     <div :class="['w-14 h-14 rounded-[1.25rem] flex items-center justify-center font-black text-sm border-2 shadow-sm', getAvatarColor(enrollment.id)]">
@@ -227,6 +240,133 @@ const getInitials = (name) => {
                         </div>
                         <h4 class="font-black text-slate-900 text-3xl tracking-tight mb-4">No Program Selected</h4>
                         <p class="text-slate-400 font-bold text-lg max-w-sm mx-auto">Choose a training program from the directory on the left to begin deep impact analysis.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact Deep-Dive Slide-over -->
+            <div v-if="showDetailSlideOver" class="fixed inset-0 z-[100] overflow-hidden">
+                <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="showDetailSlideOver = false"></div>
+                <div class="absolute inset-y-0 right-0 max-w-2xl w-full bg-white shadow-[-40px_0_80px_rgba(0,0,0,0.1)] border-l border-slate-50 flex flex-col animate-in slide-in-from-right duration-500">
+                    
+                    <!-- Header -->
+                    <div class="p-10 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                        <div class="flex items-center gap-6">
+                            <div :class="['w-16 h-16 rounded-[1.5rem] flex items-center justify-center font-black text-xl border-2 shadow-lg', getAvatarColor(selectedEnrollment.id)]">
+                                {{ getInitials(selectedEnrollment.user?.name) }}
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tight">{{ selectedEnrollment.user?.name }}</h3>
+                                <p class="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">{{ selectedTrackerCourse.title }}</p>
+                            </div>
+                        </div>
+                        <button @click="showDetailSlideOver = false" class="w-12 h-12 hover:bg-slate-100 rounded-2xl flex items-center justify-center transition-all">
+                            <ArrowLeft class="w-6 h-6 text-slate-400" />
+                        </button>
+                    </div>
+
+                    <!-- Scroll Area -->
+                    <div class="flex-1 overflow-y-auto p-10 space-y-12">
+                        
+                        <!-- 1. Delta Growth Audit (L2) -->
+                        <div class="space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <TrendingUp class="w-4 h-4" /> Pillar 02: Knowledge Growth
+                                </h4>
+                                <span class="bg-emerald-50 text-emerald-600 font-black text-[10px] px-3 py-1 rounded-full">Score Delta: +{{ selectedEnrollment.score_delta }}%</span>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div v-for="test in selectedEnrollment.l2_tests" :key="test.id" 
+                                     class="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                                            <component :is="test.type === 'pre_test' ? Clock : CheckCircle2" 
+                                                       :class="test.type === 'pre_test' ? 'text-amber-500' : 'text-emerald-500'" class="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-black text-slate-900">{{ test.curriculum_item?.title || 'General Assessment' }}</p>
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ test.type.replace('_', ' ') }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xl font-black text-slate-900">{{ test.score }}%</p>
+                                    </div>
+                                </div>
+                                <div v-if="!selectedEnrollment.l2_tests?.length" class="py-10 text-center border-2 border-dashed border-slate-100 rounded-[2rem]">
+                                    <p class="text-slate-400 font-bold text-xs">No assessment data found.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Evidence Timeline (L3) -->
+                        <div class="space-y-6">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Target class="w-4 h-4" /> Pillar 03: Behavior Evidence
+                            </h4>
+                            
+                            <div class="space-y-6 relative border-l-2 border-slate-100 ml-5 pl-8 pb-1">
+                                <div v-for="assign in selectedEnrollment.l3_assignments" :key="assign.id" class="relative group">
+                                    <div class="absolute -left-[45px] top-0 w-8 h-8 rounded-full bg-white border-4 border-indigo-600 shadow-lg z-10"></div>
+                                    <div class="bg-white border border-slate-100 p-8 rounded-[2rem] shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all">
+                                        <div class="flex justify-between items-start mb-6">
+                                            <div>
+                                                <h5 class="font-black text-slate-900 text-lg leading-none mb-2">{{ assign.curriculum_item?.title || 'Submission' }}</h5>
+                                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Submitted {{ new Date(assign.created_at).toLocaleDateString() }}</p>
+                                            </div>
+                                            <div :class="assign.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'" 
+                                                 class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                                {{ assign.status }}
+                                            </div>
+                                        </div>
+                                        <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 italic">"{{ assign.description }}"</p>
+                                        
+                                        <div class="flex gap-4">
+                                            <a v-if="assign.file_path" :href="'/storage/' + assign.file_path" target="_blank"
+                                               class="flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl font-black text-[10px] hover:bg-indigo-600 transition-all">
+                                                <FileText class="w-3 h-3" /> View Evidence
+                                            </a>
+                                            <a v-if="assign.link_url" :href="assign.link_url" target="_blank"
+                                               class="flex items-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2.5 rounded-xl font-black text-[10px] hover:bg-indigo-100 transition-all">
+                                                <ExternalLink class="w-3 h-3" /> Visit Portfolio
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="!selectedEnrollment.l3_assignments?.length" class="py-10 text-center border-2 border-dashed border-slate-100 rounded-[2rem] -ml-8">
+                                    <p class="text-slate-400 font-bold text-xs">No behavior evidence submitted yet.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. L1 Feedback -->
+                        <div v-if="selectedEnrollment.l1_feedback" class="bg-indigo-900 rounded-[3rem] p-10 text-white relative overflow-hidden group">
+                           <div class="absolute top-0 right-0 w-48 h-48 bg-indigo-500 rounded-full blur-[60px] opacity-20 -mr-24 -mt-24 transition-transform group-hover:scale-150 duration-700"></div>
+                           <h4 class="text-[10px] font-black uppercase tracking-widest text-indigo-300 mb-6 flex items-center gap-2">
+                               <Sparkles class="w-4 h-4" /> Pillar 01: Reaction Feedback
+                           </h4>
+                           <div class="flex items-center gap-1 mb-6">
+                               <Star v-for="i in 5" :key="i" :class="i <= selectedEnrollment.l1_feedback.rating ? 'text-amber-400 fill-amber-400' : 'text-indigo-800'" class="w-5 h-5" />
+                           </div>
+                           <p class="text-xl font-medium leading-relaxed italic text-indigo-50">"{{ selectedEnrollment.l1_feedback.review }}"</p>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="p-10 border-t border-slate-50 bg-slate-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                                    <Award class="text-indigo-600 w-6 h-6" />
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Certification Status</p>
+                                    <p class="text-sm font-black text-slate-900">{{ selectedEnrollment.certificate_unlocked ? 'AUTHENTICATED' : 'WAITING FOR L3 APPROVAL' }}</p>
+                                </div>
+                            </div>
+                            <button v-if="selectedEnrollment.certificate_unlocked" class="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-emerald-600 transition-all shadow-lg">Verify Certificate</button>
+                        </div>
                     </div>
                 </div>
             </div>

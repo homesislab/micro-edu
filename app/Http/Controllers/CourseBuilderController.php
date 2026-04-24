@@ -11,7 +11,7 @@ class CourseBuilderController extends Controller
     public function show(CourseRecord $courseRecord)
     {
         // Eager load all nested relationships
-        $courseRecord->load(['instructors', 'sections.lessons']);
+        $courseRecord->load(['instructors', 'modules.curriculumItems']);
 
         return Inertia::render('CourseBuilder/Show', [
             'courseRecord' => $courseRecord
