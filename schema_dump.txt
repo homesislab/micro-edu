@@ -1,0 +1,392 @@
+﻿=== academies ===
+  id | INTEGER | NOT NULL |  | PK
+  name | varchar | NOT NULL |  | 
+  slug | varchar | NOT NULL |  | 
+  logo | varchar | NULL |  | 
+  branding_settings | TEXT | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  status | varchar | NOT NULL | DEFAULT 'active' | 
+  user_quota | INTEGER | NOT NULL | DEFAULT '100' | 
+  is_public | tinyint(1) | NOT NULL | DEFAULT '1' | 
+  allow_self_enroll | tinyint(1) | NOT NULL | DEFAULT '1' | 
+  primary_color | varchar | NOT NULL | DEFAULT '#4f46e5' | 
+  secondary_color | varchar | NOT NULL | DEFAULT '#06b6d4' | 
+  IDX: organizations_slug_unique: CREATE UNIQUE INDEX "organizations_slug_unique" on "academies" ("slug")
+
+=== academy_user ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  academy_id | INTEGER | NOT NULL |  | 
+  role | varchar | NOT NULL | DEFAULT 'participant' | 
+  last_accessed_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: academy_id -> academies.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+
+=== activity_logs ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NULL |  | 
+  action | varchar | NOT NULL |  | 
+  subject_type | varchar | NULL |  | 
+  subject_id | INTEGER | NULL |  | 
+  description | varchar | NULL |  | 
+  properties | TEXT | NULL |  | 
+  ip_address | varchar | NULL |  | 
+  user_agent | TEXT | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: user_id -> users.id (on_delete=SET NULL)
+  IDX: activity_logs_subject_type_subject_id_index: CREATE INDEX "activity_logs_subject_type_subject_id_index" on "activity_logs" ("subject_type", "subject_id")
+
+=== blogs ===
+  id | INTEGER | NOT NULL |  | PK
+  expert_id | INTEGER | NOT NULL |  | 
+  title | varchar | NOT NULL |  | 
+  slug | varchar | NOT NULL |  | 
+  content | TEXT | NOT NULL |  | 
+  category | varchar | NULL |  | 
+  status | varchar | NOT NULL | DEFAULT 'draft' | 
+  published_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: expert_id -> users.id (on_delete=CASCADE)
+  IDX: blogs_slug_unique: CREATE UNIQUE INDEX "blogs_slug_unique" on "blogs" ("slug")
+
+=== cache ===
+  key | varchar | NOT NULL |  | PK
+  value | TEXT | NOT NULL |  | 
+  expiration | INTEGER | NOT NULL |  | 
+  IDX: cache_expiration_index: CREATE INDEX "cache_expiration_index" on "cache" ("expiration")
+
+=== cache_locks ===
+  key | varchar | NOT NULL |  | PK
+  owner | varchar | NOT NULL |  | 
+  expiration | INTEGER | NOT NULL |  | 
+  IDX: cache_locks_expiration_index: CREATE INDEX "cache_locks_expiration_index" on "cache_locks" ("expiration")
+
+=== certificate_templates ===
+  id | INTEGER | NOT NULL |  | PK
+  expert_id | INTEGER | NOT NULL |  | 
+  name | varchar | NOT NULL |  | 
+  content_html | TEXT | NULL |  | 
+  background_image_path | varchar | NULL |  | 
+  is_default | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: expert_id -> users.id (on_delete=CASCADE)
+
+=== comments ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  thread_id | INTEGER | NOT NULL |  | 
+  parent_id | INTEGER | NULL |  | 
+  content | TEXT | NOT NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: parent_id -> comments.id (on_delete=CASCADE)
+  FK: thread_id -> threads.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+
+=== course_materials ===
+  id | INTEGER | NOT NULL |  | PK
+  course_id | INTEGER | NOT NULL |  | 
+  type | varchar | NOT NULL | DEFAULT 'video' | 
+  title | varchar | NOT NULL |  | 
+  content | TEXT | NOT NULL |  | 
+  order_index | INTEGER | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  rubric_json | TEXT | NULL |  | 
+  FK: course_id -> courses.id (on_delete=CASCADE)
+
+=== course_record_instructor ===
+  course_record_id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | PK
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: user_id -> users.id (on_delete=CASCADE)
+  FK: course_record_id -> course_records.id (on_delete=CASCADE)
+
+=== course_records ===
+  id | INTEGER | NOT NULL |  | PK
+  academy_id | INTEGER | NOT NULL |  | 
+  name | varchar | NOT NULL |  | 
+  description | TEXT | NULL |  | 
+  price | INTEGER | NULL |  | 
+  thumbnail_path | varchar | NULL |  | 
+  is_published | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: academy_id -> academies.id (on_delete=CASCADE)
+
+=== courses ===
+  id | INTEGER | NOT NULL |  | PK
+  title | varchar | NOT NULL |  | 
+  description | TEXT | NULL |  | 
+  expert_id | INTEGER | NOT NULL |  | 
+  passing_grade | INTEGER | NOT NULL | DEFAULT '75' | 
+  status | varchar | NOT NULL | DEFAULT 'draft' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  price | numeric | NOT NULL | DEFAULT '0' | 
+  discount_price | numeric | NULL |  | 
+  thumbnail_path | varchar | NULL |  | 
+  attendance_code | varchar | NULL |  | 
+  zoom_link | varchar | NULL |  | 
+  event_time | datetime | NULL |  | 
+  is_recording_available | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  recording_url | varchar | NULL |  | 
+  academy_id | INTEGER | NULL |  | 
+  is_premium | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  fast_track_threshold | INTEGER | NOT NULL | DEFAULT '90' | 
+  FK: academy_id -> academies.id (on_delete=SET NULL)
+  FK: expert_id -> users.id (on_delete=NO ACTION)
+
+=== curriculum_items ===
+  id | INTEGER | NOT NULL |  | PK
+  module_id | INTEGER | NOT NULL |  | 
+  title | varchar | NOT NULL |  | 
+  type | varchar | NOT NULL |  | 
+  content_json | TEXT | NULL |  | 
+  order | INTEGER | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  rubric_json | TEXT | NULL |  | 
+  is_capstone | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  FK: module_id -> modules.id (on_delete=CASCADE)
+
+=== enrollments ===
+  id | INTEGER | NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  course_id | INTEGER | NOT NULL |  | 
+  status | varchar | NOT NULL | DEFAULT 'enrolled' | 
+  pretest_score | INTEGER | NULL |  | 
+  posttest_score | INTEGER | NULL |  | 
+  score_delta | INTEGER | NULL |  | 
+  certificate_unlocked | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  enrolled_at | datetime | NOT NULL | DEFAULT CURRENT_TIMESTAMP | 
+  completed_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  attended_at | datetime | NULL |  | 
+  attendance_status | varchar | NOT NULL | DEFAULT 'absent' | 
+  points | INTEGER | NOT NULL | DEFAULT '0' | 
+  FK: course_id -> courses.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+
+=== evaluation_l1_feedback ===
+  id | INTEGER | NOT NULL |  | PK
+  enrollment_id | INTEGER | NOT NULL |  | 
+  rating | INTEGER | NOT NULL |  | 
+  review | TEXT | NULL |  | 
+  submitted_at | datetime | NOT NULL | DEFAULT CURRENT_TIMESTAMP | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: enrollment_id -> enrollments.id (on_delete=CASCADE)
+  IDX: evaluation_l1_feedback_enrollment_id_unique: CREATE UNIQUE INDEX "evaluation_l1_feedback_enrollment_id_unique" on "evaluation_l1_feedback" ("enrollment_id")
+
+=== evaluation_l2_tests ===
+  id | INTEGER | NOT NULL |  | PK
+  enrollment_id | INTEGER | NOT NULL |  | 
+  type | varchar | NOT NULL |  | 
+  answers | TEXT | NOT NULL |  | 
+  score | INTEGER | NOT NULL |  | 
+  submitted_at | datetime | NOT NULL | DEFAULT CURRENT_TIMESTAMP | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: enrollment_id -> enrollments.id (on_delete=CASCADE)
+  IDX: evaluation_l2_tests_enrollment_id_type_unique: CREATE UNIQUE INDEX "evaluation_l2_tests_enrollment_id_type_unique" on "evaluation_l2_tests" ("enrollment_id", "type")
+
+=== evaluation_l3_assignments ===
+  id | INTEGER | NOT NULL |  | PK
+  enrollment_id | INTEGER | NOT NULL |  | 
+  submission_type | varchar | NOT NULL |  | 
+  file_path | varchar | NULL |  | 
+  link_url | varchar | NULL |  | 
+  description | TEXT | NULL |  | 
+  status | varchar | NOT NULL | DEFAULT 'pending' | 
+  expert_id | INTEGER | NULL |  | 
+  expert_notes | TEXT | NULL |  | 
+  reviewed_at | datetime | NULL |  | 
+  submitted_at | datetime | NOT NULL | DEFAULT CURRENT_TIMESTAMP | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: expert_id -> users.id (on_delete=NO ACTION)
+  FK: enrollment_id -> enrollments.id (on_delete=CASCADE)
+
+=== failed_jobs ===
+  id | INTEGER | NOT NULL |  | PK
+  uuid | varchar | NOT NULL |  | 
+  connection | TEXT | NOT NULL |  | 
+  queue | TEXT | NOT NULL |  | 
+  payload | TEXT | NOT NULL |  | 
+  exception | TEXT | NOT NULL |  | 
+  failed_at | datetime | NOT NULL | DEFAULT CURRENT_TIMESTAMP | 
+  IDX: failed_jobs_uuid_unique: CREATE UNIQUE INDEX "failed_jobs_uuid_unique" on "failed_jobs" ("uuid")
+
+=== invoices ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  course_id | INTEGER | NOT NULL |  | 
+  academy_id | INTEGER | NOT NULL |  | 
+  amount | numeric | NOT NULL |  | 
+  platform_fee | numeric | NOT NULL |  | 
+  creator_revenue | numeric | NOT NULL |  | 
+  status | varchar | NOT NULL | DEFAULT 'pending' | 
+  payment_gateway | varchar | NULL |  | 
+  reference_id | varchar | NULL |  | 
+  paid_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: academy_id -> academies.id (on_delete=CASCADE)
+  FK: course_id -> courses.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+
+=== job_batches ===
+  id | varchar | NOT NULL |  | PK
+  name | varchar | NOT NULL |  | 
+  total_jobs | INTEGER | NOT NULL |  | 
+  pending_jobs | INTEGER | NOT NULL |  | 
+  failed_jobs | INTEGER | NOT NULL |  | 
+  failed_job_ids | TEXT | NOT NULL |  | 
+  options | TEXT | NULL |  | 
+  cancelled_at | INTEGER | NULL |  | 
+  created_at | INTEGER | NOT NULL |  | 
+  finished_at | INTEGER | NULL |  | 
+
+=== jobs ===
+  id | INTEGER | NOT NULL |  | PK
+  queue | varchar | NOT NULL |  | 
+  payload | TEXT | NOT NULL |  | 
+  attempts | INTEGER | NOT NULL |  | 
+  reserved_at | INTEGER | NULL |  | 
+  available_at | INTEGER | NOT NULL |  | 
+  created_at | INTEGER | NOT NULL |  | 
+  IDX: jobs_queue_index: CREATE INDEX "jobs_queue_index" on "jobs" ("queue")
+
+=== migrations ===
+  id | INTEGER | NOT NULL |  | PK
+  migration | varchar | NOT NULL |  | 
+  batch | INTEGER | NOT NULL |  | 
+
+=== modules ===
+  id | INTEGER | NOT NULL |  | PK
+  course_record_id | INTEGER | NULL |  | 
+  title | varchar | NOT NULL |  | 
+  order | INTEGER | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  course_id | INTEGER | NULL |  | 
+  FK: course_id -> courses.id (on_delete=CASCADE)
+  FK: course_record_id -> course_records.id (on_delete=CASCADE)
+
+=== notifications ===
+  id | varchar | NOT NULL |  | PK
+  type | varchar | NOT NULL |  | 
+  notifiable_type | varchar | NOT NULL |  | 
+  notifiable_id | INTEGER | NOT NULL |  | 
+  data | TEXT | NOT NULL |  | 
+  read_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  IDX: notifications_notifiable_type_notifiable_id_index: CREATE INDEX "notifications_notifiable_type_notifiable_id_index" on "notifications" ("notifiable_type", "notifiable_id")
+
+=== password_reset_tokens ===
+  email | varchar | NOT NULL |  | PK
+  token | varchar | NOT NULL |  | 
+  created_at | datetime | NULL |  | 
+
+=== rubric_scores ===
+  id | INTEGER | NOT NULL |  | PK
+  assignment_id | INTEGER | NOT NULL |  | 
+  rubric_template_id | INTEGER | NULL |  | 
+  details_json | TEXT | NOT NULL |  | 
+  total_score | INTEGER | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: rubric_template_id -> rubric_templates.id (on_delete=SET NULL)
+  FK: assignment_id -> evaluation_l3_assignments.id (on_delete=CASCADE)
+
+=== rubric_templates ===
+  id | INTEGER | NOT NULL |  | PK
+  expert_id | INTEGER | NOT NULL |  | 
+  course_id | INTEGER | NULL |  | 
+  name | varchar | NOT NULL |  | 
+  criteria_json | TEXT | NOT NULL |  | 
+  is_default | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: course_id -> courses.id (on_delete=SET NULL)
+  FK: expert_id -> users.id (on_delete=CASCADE)
+
+=== sessions ===
+  id | varchar | NOT NULL |  | PK
+  user_id | INTEGER | NULL |  | 
+  ip_address | varchar | NULL |  | 
+  user_agent | TEXT | NULL |  | 
+  payload | TEXT | NOT NULL |  | 
+  last_activity | INTEGER | NOT NULL |  | 
+  IDX: sessions_user_id_index: CREATE INDEX "sessions_user_id_index" on "sessions" ("user_id")
+  IDX: sessions_last_activity_index: CREATE INDEX "sessions_last_activity_index" on "sessions" ("last_activity")
+
+=== test_questions ===
+  id | INTEGER | NOT NULL |  | PK
+  course_id | INTEGER | NOT NULL |  | 
+  type | varchar | NOT NULL |  | 
+  question_text | TEXT | NOT NULL |  | 
+  options | TEXT | NOT NULL |  | 
+  correct_key | varchar | NOT NULL |  | 
+  order | INTEGER | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: course_id -> courses.id (on_delete=CASCADE)
+
+=== threads ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  course_id | INTEGER | NOT NULL |  | 
+  academy_id | INTEGER | NOT NULL |  | 
+  title | varchar | NOT NULL |  | 
+  content | TEXT | NOT NULL |  | 
+  is_pinned | tinyint(1) | NOT NULL | DEFAULT '0' | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: academy_id -> academies.id (on_delete=CASCADE)
+  FK: course_id -> courses.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+
+=== user_certificates ===
+  id | INTEGER | NOT NULL |  | PK
+  user_id | INTEGER | NOT NULL |  | 
+  course_id | INTEGER | NOT NULL |  | 
+  template_id | INTEGER | NOT NULL |  | 
+  certificate_code | varchar | NOT NULL |  | 
+  file_path | varchar | NULL |  | 
+  issued_at | datetime | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  FK: template_id -> certificate_templates.id (on_delete=CASCADE)
+  FK: course_id -> courses.id (on_delete=CASCADE)
+  FK: user_id -> users.id (on_delete=CASCADE)
+  IDX: user_certificates_certificate_code_unique: CREATE UNIQUE INDEX "user_certificates_certificate_code_unique" on "user_certificates" ("certificate_code")
+
+=== users ===
+  id | INTEGER | NOT NULL |  | PK
+  name | varchar | NOT NULL |  | 
+  email | varchar | NOT NULL |  | 
+  role | varchar | NOT NULL | DEFAULT 'participant' | 
+  email_verified_at | datetime | NULL |  | 
+  password | varchar | NOT NULL |  | 
+  remember_token | varchar | NULL |  | 
+  created_at | datetime | NULL |  | 
+  updated_at | datetime | NULL |  | 
+  academy_id | INTEGER | NULL |  | 
+  username | varchar | NULL |  | 
+  bio | TEXT | NULL |  | 
+  avatar_url | varchar | NULL |  | 
+  FK: academy_id -> academies.id (on_delete=SET NULL)
+  IDX: users_email_unique: CREATE UNIQUE INDEX "users_email_unique" on "users" ("email")
+  IDX: users_username_unique: CREATE UNIQUE INDEX "users_username_unique" on "users" ("username")
+
