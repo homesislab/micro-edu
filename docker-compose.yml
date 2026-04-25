@@ -11,6 +11,8 @@ services:
     env_file:
       - .env
     environment:
+      - APP_KEY=base64:etSKu27PACV+Vu3VPu0GufGLAKRaG0obnPSVXLDWMAk=
+      - APP_URL=https://edu.homesislab.my.id
       - APP_ENV=production
       - DB_CONNECTION=mysql
       - DB_HOST=172.26.0.10
