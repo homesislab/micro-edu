@@ -8,37 +8,36 @@ use App\Models\Enrollment;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class TenantAdminController extends Controller
 {
     public function dashboard()
     {
-        $orgId = auth()->user()->organization_id;
+        $academyId = auth()->user()->academy_id;
 
         return Inertia::render('TenantAdmin/Dashboard', [
             'stats' => [
-                'total_employees' => User::where('organization_id', $orgId)->count(),
-                'active_enrollments' => Enrollment::whereHas('course', function($q) use ($orgId) {
-                    $q->where('organization_id', $orgId);
+                'total_employees'    => User::where('academy_id', $academyId)->count(),
+                'active_enrollments' => Enrollment::whereHas('course', function ($q) use ($academyId) {
+                    $q->where('academy_id', $academyId);
                 })->count(),
-                'completion_rate' => 78, // Placeholder for aggregation logic
-                'expert_count' => User::where('organization_id', $orgId)->where('role', 'expert')->count(),
+                'completion_rate'    => $this->calcCompletionRate($academyId),
+                'expert_count'       => User::where('academy_id', $academyId)->where('role', 'expert')->count(),
             ],
             'recent_activity' => Enrollment::with(['user', 'course'])
-                ->whereHas('course', function($q) use ($orgId) {
-                    $q->where('organization_id', $orgId);
+                ->whereHas('course', function ($q) use ($academyId) {
+                    $q->where('academy_id', $academyId);
                 })
                 ->latest()
-                ->limit(5)
-                ->get()
+                ->limit(10)
+                ->get(),
         ]);
     }
 
     public function userIndex()
     {
-        $orgId = auth()->user()->organization_id;
-        $users = User::where('organization_id', $orgId)->latest()->paginate(10);
+        $academyId = auth()->user()->academy_id;
+        $users = User::where('academy_id', $academyId)->latest()->paginate(15);
 
         return Inertia::render('TenantAdmin/Users/Index', [
             'users' => $users
@@ -51,31 +50,39 @@ class TenantAdminController extends Controller
             'file' => 'required|file|mimes:csv,txt|max:2048',
         ]);
 
-        $path = $request->file('file')->getRealPath();
-        $data = array_map('str_getcsv', file($path));
-        
-        $header = array_shift($data);
-        $orgId = auth()->user()->organization_id;
-        $count = 0;
+        $path   = $request->file('file')->getRealPath();
+        $data   = array_map('str_getcsv', file($path));
+        $header = array_shift($data); // skip header row
+
+        $academyId = auth()->user()->academy_id;
+        $count     = 0;
 
         foreach ($data as $row) {
             if (count($row) < 2) continue;
-            
-            $name = $row[0];
-            $email = $row[1];
+
+            [$name, $email] = $row;
 
             User::updateOrCreate(
                 ['email' => $email],
                 [
-                    'name' => $name,
-                    'password' => Hash::make('password123'),
-                    'role' => 'user',
-                    'organization_id' => $orgId
+                    'name'       => $name,
+                    'password'   => Hash::make('password123'),
+                    'role'       => 'user',
+                    'academy_id' => $academyId,
                 ]
             );
             $count++;
         }
 
-        return back()->with('success', "Successfully imported $count users.");
+        return back()->with('success', "Successfully imported {$count} users.");
+    }
+
+    private function calcCompletionRate(int $academyId): int
+    {
+        $total     = Enrollment::whereHas('course', fn($q) => $q->where('academy_id', $academyId))->count();
+        $completed = Enrollment::whereHas('course', fn($q) => $q->where('academy_id', $academyId))
+            ->where('status', 'completed')->count();
+
+        return $total > 0 ? (int) round(($completed / $total) * 100) : 0;
     }
 }

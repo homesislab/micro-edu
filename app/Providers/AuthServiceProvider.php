@@ -1,7 +1,10 @@
-use App\Models\Team;
-use App\Policies\TeamPolicy;
+<?php
+
+namespace App\Providers;
+
 use App\Models\Enrollment;
 use App\Policies\EnrollmentPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -17,8 +20,8 @@ class AuthServiceProvider extends ServiceProvider
     /**
      * Register any authentication / authorization services.
      */
-    public function boot()
+    public function boot(): void
     {
-        parent::boot();
+        $this->registerPolicies();
     }
 }

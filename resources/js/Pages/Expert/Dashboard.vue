@@ -3,13 +3,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import {
-    ClipboardList, User, ExternalLink, FileText,
-    ShieldCheck, Search, ChevronRight, BookOpen,
-    Settings, BarChart3, Download, Users, Award,
-    TrendingUp, Key, Copy, CheckCircle2, X, Plus,
-    Sparkles, Loader2, LayoutGrid, Clock, Bell, Star, Trash2, Rocket
+    Users, Award, TrendingUp, Search, Plus, 
+    BookOpen, User, ArrowRight, X, Loader2,
+    ShieldCheck, Bell, Sparkles, Filter, 
+    ChevronRight, MoreVertical, Rocket, Target, Zap
 } from 'lucide-vue-next';
-import ExpertReviewForm from '@/Components/Expert/ExpertReviewForm.vue';
 import Modal from '@/Components/Modal.vue';
 import InputError from '@/Components/InputError.vue';
 import axios from 'axios';
@@ -18,37 +16,46 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 
 const props = defineProps({
-    assignments: Array,
+    assignments: {
+        type: Array,
+        default: () => []
+    },
     courses: {
         type: Array,
         default: () => []
     },
+    expertStats: {
+        type: Object,
+        default: () => ({
+            total_students: 0,
+            certifications_issued: 0,
+            success_velocity: 0
+        })
+    },
     defaultTemplate: Object,
 });
 
-const activeMode = ref('review');
-const selectedTrackerCourse = ref(null);
-const selectedAssignment = ref(null);
-const copiedCodeId = ref(null);
 const searchQuery = ref('');
-
-const copyAttendanceCode = async (course) => {
-    if (!course.attendance_code) return;
-    await navigator.clipboard.writeText(course.attendance_code);
-    copiedCodeId.value = course.id;
-    setTimeout(() => copiedCodeId.value = null, 2000);
-};
-
-const selectAssignment = (assignment) => {
-    selectedAssignment.value = assignment;
-};
-
 const showCreateModal = ref(false);
+const isGeneratingAI = ref(false);
+const aiTopic = ref('');
+
 const createForm = useForm({
     title: '',
     description: '',
     passing_grade: 75,
 });
+
+const filteredCourses = computed(() => {
+    const q = searchQuery.value.toLowerCase();
+    if (!q) return props.courses;
+    return props.courses.filter(c => 
+        c.title.toLowerCase().includes(q) || 
+        c.description?.toLowerCase().includes(q)
+    );
+});
+
+const pendingReviewsCount = computed(() => props.assignments?.length || 0);
 
 const submitCreateCourse = () => {
     createForm.post(route('expert.courses.store'), {
@@ -58,9 +65,6 @@ const submitCreateCourse = () => {
         }
     });
 };
-
-const isGeneratingAI = ref(false);
-const aiTopic = ref('');
 
 const generateWithAI = async () => {
     if (!aiTopic.value) return;
@@ -78,551 +82,290 @@ const generateWithAI = async () => {
     }
 };
 
-const deleteCourse = (id) => {
-    if (confirm('Are you sure you want to delete this program? This action cannot be undone.')) {
-        useForm({}).delete(route('expert.courses.delete', id), {
-            preserveScroll: true
-        });
-    }
+const quickTemplates = [
+    { title: 'Bootcamp', prompt: '4-week intensive bootcamp for ', icon: Rocket, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { title: 'Onboarding', prompt: 'Employee onboarding program for ', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { title: 'Technical', prompt: 'Technical deep-dive workshop for ', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50' }
+];
+
+const useQuickTemplate = (template) => {
+    aiTopic.value = template.prompt;
+    showCreateModal.value = true;
 };
 
-const toggleStatus = (course) => {
-    const newStatus = course.status === 'published' ? 'draft' : 'published';
-    useForm({
-        status: newStatus
-    }).patch(route('expert.courses.status.update', course.id), {
-        preserveScroll: true
-    });
-};
-
-const expertStats = computed(() => {
-    const total_students = props.courses?.reduce((acc, c) => acc + (c?.enrollments_count || 0), 0) || 0;
-    const completed_students = props.courses?.reduce((acc, c) => {
-        return acc + (c?.enrollments?.filter(e => e?.status === 'completed')?.length || 0);
-    }, 0) || 0;
-    const success_velocity = total_students > 0 ? Math.round((completed_students / total_students) * 100) : 0;
-
-    return {
-        total_students,
-        certifications_issued: completed_students,
-        success_velocity
-    };
-});
-
-const pendingCount = computed(() => props.assignments?.length || 0);
-
-const filteredAssignments = computed(() => {
-    const q = searchQuery.value.toLowerCase();
-    if (!q) return props.assignments || [];
-    return (props.assignments || []).filter(a =>
-        a.enrollment?.user?.name?.toLowerCase().includes(q) ||
-        a.enrollment?.course?.title?.toLowerCase().includes(q)
-    );
-});
-
-// Avatar initials helper
 const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 };
-
-const avatarColors = [
-    'bg-violet-100 text-violet-700',
-    'bg-sky-100 text-sky-700',
-    'bg-rose-100 text-rose-700',
-    'bg-amber-100 text-amber-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-indigo-100 text-indigo-700',
-];
-const getAvatarColor = (id) => avatarColors[(id || 0) % avatarColors.length];
 </script>
 
 <template>
-    <Head title="Expert Control Center" />
+    <Head title="Expert Dashboard" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-2 mt-4">
-                <!-- Compact Title block -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+            
+            <!-- 1. HERO SECTION -->
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div class="space-y-1">
+                    <h1 class="text-4xl font-black text-slate-900 tracking-tight">
+                        Welcome back, {{ user?.name || 'Expert' }}<span class="text-indigo-600">.</span>
+                    </h1>
+                    <p class="text-slate-500 font-medium text-lg">
+                        Managing {{ props.courses?.length || 0 }} transformational programs.
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Action buttons removed per user request -->
+                </div>
+            </div>
+
+            <!-- 2. TOP METRICS GRID -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Card 1: Total Active Learners -->
+                <div class="bg-white p-8 rounded-[2rem] border border-slate-200/60 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex flex-col gap-4">
+                        <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100/50">
+                            <Users class="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Total Active Learners</p>
+                            <h3 class="text-4xl font-black text-slate-900 mt-1">{{ props.expertStats.total_students || 0 }}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Average Completion Rate -->
+                <div class="bg-white p-8 rounded-[2rem] border border-slate-200/60 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex flex-col gap-4">
+                        <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/50">
+                            <TrendingUp class="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Avg. Completion Rate</p>
+                            <h3 class="text-4xl font-black text-slate-900 mt-1">{{ props.expertStats.success_velocity || 0 }}%</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Action Alert (Pending Reviews) -->
+                <Link :href="route('expert.review-queue')" 
+                      class="bg-white p-8 rounded-[2rem] border border-slate-200/60 shadow-sm hover:shadow-xl hover:shadow-purple-100 hover:border-purple-200 transition-all group overflow-hidden relative block">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex flex-col gap-4">
+                        <div class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 border border-purple-100/50 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                            <Award class="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Action Required</p>
+                            <h3 class="text-2xl font-black mt-1" :class="pendingReviewsCount > 0 ? 'text-purple-600' : 'text-slate-900'">
+                                {{ pendingReviewsCount }} L3 Missions <span class="text-sm font-bold text-slate-400 block sm:inline">pending review</span>
+                            </h3>
+                        </div>
+                    </div>
+                    <!-- Subtle active indicator if > 0 -->
+                    <div v-if="pendingReviewsCount > 0" class="absolute top-4 right-8 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-purple-500 rounded-full animate-ping"></span>
+                        <span class="text-[9px] font-black text-purple-600 uppercase tracking-widest">Active</span>
+                    </div>
+                    <div class="mt-4 flex items-center gap-1 text-[10px] font-black text-purple-600 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                        OPEN QUEUE <ArrowRight class="w-3 h-3" />
+                    </div>
+                </Link>
+            </div>
+
+            <!-- 3. CATALOG HEADER SECTION -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 mb-2">
                 <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg flex-shrink-0">
-                        <LayoutGrid class="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-black text-slate-900 tracking-tight">Expert Panel</h2>
-                        <p class="text-slate-400 font-bold text-[10px] uppercase tracking-widest leading-none mt-1">LMS Administration</p>
-                    </div>
+                   <div class="w-1 h-10 bg-indigo-600 rounded-full"></div>
+                   <h2 class="text-2xl font-black text-slate-900 tracking-tight">Your Programs</h2>
                 </div>
-
-                <!-- Tab Switcher — cleaner style -->
-                <nav class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/50 gap-1">
-                    <button @click="activeMode = 'review'"
-                            :class="activeMode === 'review' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
-                            class="px-4 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center gap-2 whitespace-nowrap">
-                        <ClipboardList class="w-3 h-3" /> Review Queue
-                        <span v-if="pendingCount > 0"
-                              class="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
-                            {{ pendingCount }}
-                        </span>
+                
+                <div class="flex items-center gap-4 flex-1 max-w-2xl justify-end">
+                    <!-- Search Bar -->
+                    <div class="relative flex-1 group">
+                        <Search class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <input v-model="searchQuery" type="text" placeholder="Search by title..." 
+                               class="w-full pl-12 pr-4 py-3 bg-slate-100 border-transparent rounded-[1.25rem] font-bold text-sm text-slate-700 focus:bg-white transition-all outline-none" />
+                    </div>
+                    
+                    <!-- CTA Button -->
+                    <button @click="showCreateModal = true" 
+                            class="bg-slate-900 text-white px-6 py-3 rounded-[1.25rem] font-black text-sm flex items-center gap-2 shadow-xl shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-100 hover:-translate-y-0.5 transition-all active:scale-95 flex-shrink-0">
+                        <Plus class="w-4 h-4" /> New Program
                     </button>
-                    <button @click="activeMode = 'courses'"
-                            :class="activeMode === 'courses' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
-                            class="px-4 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center gap-2 whitespace-nowrap">
-                        <BookOpen class="w-3 h-3" /> Programs
-                    </button>
-                    <button @click="activeMode = 'tracker'"
-                            :class="activeMode === 'tracker' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
-                            class="px-4 py-2 rounded-lg font-bold text-[11px] transition-all flex items-center gap-2 whitespace-nowrap">
-                        <BarChart3 class="w-3 h-3" /> Insights
-                    </button>
-                </nav>
+                </div>
             </div>
-        </template>
 
-        <!-- ══════════════════════════════════════════
-             TAB 1 — REVIEW QUEUE (Master-Detail)
-        ══════════════════════════════════════════ -->
-        <div v-if="activeMode === 'review'"
-             class="flex bg-slate-50 border-t border-slate-200"
-             style="height: calc(100vh - 140px); margin: -16px -24px -24px -24px;">
-
-            <!-- LEFT COLUMN — Master List (30%) -->
-            <div class="w-[30%] min-w-[320px] flex-shrink-0 flex flex-col bg-white border-r border-slate-200 z-10">
-                <!-- Search -->
-                <div class="p-4 border-b border-slate-200">
-                    <div class="relative">
-                        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input v-model="searchQuery" type="text" placeholder="Search by name or mission..."
-                               class="w-full pl-9 pr-3 py-2 bg-slate-50 rounded-lg text-sm font-medium text-slate-700 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none" />
+            <!-- 4. PROGRAM GRID -->
+            <div v-if="filteredCourses.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div v-for="course in filteredCourses" :key="course.id" 
+                     class="group bg-white rounded-[2.5rem] border border-slate-200/50 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all duration-500 overflow-hidden flex flex-col h-full bg-gradient-to-b hover:from-indigo-50/20 hover:to-white">
+                    
+                    <!-- Card Cover -->
+                    <div class="h-48 relative overflow-hidden bg-slate-900 flex items-center justify-center">
+                        <img v-if="course.thumbnail_path" :src="'/storage/' + course.thumbnail_path"
+                             class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-700 group-hover:scale-110" />
+                        <div v-else class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center">
+                            <BookOpen class="w-16 h-16 text-slate-700/50 transition-colors" />
+                        </div>
+                        
+                        <!-- Top Badges -->
+                        <div class="absolute top-6 left-6 right-6 flex justify-between items-center">
+                            <span :class="course.status === 'published' ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-200 text-slate-700 shadow-slate-100'"
+                                  class="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg backdrop-blur-md border border-white/20">
+                                {{ course.status || 'Draft' }}
+                            </span>
+                        </div>
+                        
+                        <!-- Registered Floating Badge -->
+                        <div class="absolute bottom-6 left-6 bg-white/10 backdrop-blur-xl border border-white/20 px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-lg group-hover:bg-white/20">
+                            <User class="w-3.5 h-3.5 text-white" />
+                            <span class="text-[11px] font-black text-white">{{ course.enrollments_count || 0 }}</span>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Assignment List -->
-                <div class="flex-1 overflow-y-auto">
-                    <!-- Empty state -->
-                    <div v-if="filteredAssignments.length === 0" class="flex flex-col items-center justify-center h-full py-12 px-6 text-center">
-                        <p class="font-semibold text-slate-400 text-sm">Inbox Empty</p>
-                    </div>
+                    <!-- Card Body -->
+                    <div class="p-8 flex flex-col flex-1 space-y-6">
+                        <div class="space-y-1">
+                            <p class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">{{ course.section?.name || 'Academic Core' }}</p>
+                            <h3 class="text-xl font-black text-slate-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                                {{ course.title }}
+                            </h3>
+                        </div>
 
-                    <!-- Assignment cards -->
-                    <div v-for="assignment in filteredAssignments" :key="assignment.id"
-                         @click="selectAssignment(assignment)"
-                         :class="[
-                             'cursor-pointer transition-colors border-b border-slate-100 p-4',
-                             selectedAssignment?.id === assignment.id
-                                 ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
-                                 : 'bg-white border-l-4 border-l-transparent hover:bg-slate-50'
-                         ]">
-                        <div class="flex items-start gap-3">
-                            <!-- Avatar -->
-                            <div :class="['w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0', getAvatarColor(assignment.id)]">
-                                {{ getInitials(assignment.enrollment?.user?.name) }}
-                            </div>
-                            <!-- Meta -->
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-start justify-between gap-1 mb-1">
-                                    <p class="font-bold text-slate-900 text-sm leading-tight truncate">
-                                        {{ assignment?.enrollment?.user?.name || 'Unknown' }}
-                                    </p>
-                                    <span class="text-xs text-slate-400 font-medium whitespace-nowrap flex-shrink-0">
-                                        {{ assignment?.created_at ? new Date(assignment.created_at).toLocaleDateString() : 'New' }}
-                                    </span>
+                        <p class="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed">
+                            {{ course.description || 'No description provided.' }}
+                        </p>
+
+                        <!-- Bottom Stats & Action -->
+                        <div class="pt-6 border-t border-slate-50 mt-auto flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Yield</span>
+                                    <span class="font-black text-slate-900 font-mono text-sm">${{ course.price || 0 }}</span>
                                 </div>
-                                <p class="text-xs text-slate-500 font-medium truncate">
-                                    {{ assignment?.enrollment?.course?.title || 'Unknown Mission' }}
-                                </p>
+                                <div class="w-px h-6 bg-slate-100"></div>
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Target</span>
+                                    <span class="font-black text-slate-900 text-sm">{{ course.passing_grade }}%</span>
+                                </div>
                             </div>
+                            
+                            <Link :href="route('expert.courses.builder', course.id)" 
+                                  class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-xl group-hover:shadow-indigo-100 transition-all duration-300">
+                                <ArrowRight class="w-5 h-5" />
+                            </Link>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- RIGHT COLUMN — Detail Canvas (70%) -->
-            <div class="w-[70%] flex flex-col bg-slate-50 relative overflow-hidden">
-
-                <!-- EMPTY STATE -->
-                <div v-if="!selectedAssignment" class="flex-1 flex flex-col items-center justify-center p-10">
-                    <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-200">
-                        <Search class="w-6 h-6 text-slate-300" />
+            <!-- Empty State -->
+            <div v-else class="py-20 text-center bg-white rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center space-y-12">
+                <div class="space-y-6 flex flex-col items-center">
+                    <div class="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200">
+                        <BookOpen class="w-12 h-12" />
                     </div>
-                    <h3 class="text-lg font-bold text-slate-400">Nothing selected</h3>
-                    <p class="text-slate-400 font-medium text-sm text-center">Select a submission from the inbox to begin evaluation.</p>
-                </div>
-
-                <!-- ACTIVE SUBMISSION DETAIL -->
-                <div v-else class="flex-1 flex flex-col h-full">
-                    <!-- Top Header -->
-                    <div class="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between shrink-0 shadow-sm z-10">
-                        <div class="flex items-center gap-4">
-                            <div :class="['w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg', getAvatarColor(selectedAssignment?.id)]">
-                                {{ getInitials(selectedAssignment?.enrollment?.user?.name) }}
-                            </div>
-                            <div>
-                                <h3 class="font-extrabold text-slate-900 text-xl leading-tight">{{ selectedAssignment?.enrollment?.user?.name || 'Student Name' }}</h3>
-                                <p class="text-sm text-slate-500 font-medium mt-1">{{ selectedAssignment?.enrollment?.course?.title || 'Mission Name' }}</p>
-                            </div>
-                        </div>
-                        <a :href="selectedAssignment.submission_type === 'file' ? '/storage/' + selectedAssignment.file_path : selectedAssignment.link_url"
-                           target="_blank"
-                           class="flex items-center gap-2 text-sm font-semibold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-100">
-                            <ExternalLink class="w-4 h-4" /> View Original Mission
-                        </a>
-                    </div>
-
-                    <!-- Center Content (Scrollable) -->
-                    <div class="flex-1 overflow-y-auto p-8">
-                        <div class="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl shadow-sm p-8">
-                            <h4 class="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">Submission Evidence</h4>
-                            <div class="bg-slate-50 rounded-lg p-5 border border-slate-100">
-                                <div v-if="selectedAssignment.submission_type === 'file'" class="flex items-center gap-4">
-                                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                                        <FileText class="text-blue-600 w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <p class="font-bold text-slate-900">{{ selectedAssignment.file_path?.split('/').pop() }}</p>
-                                        <p class="text-xs text-slate-500 mt-1">Uploaded Document</p>
-                                    </div>
-                                </div>
-                                <div v-else class="flex items-center gap-4">
-                                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                                        <ExternalLink class="text-violet-600 w-6 h-6" />
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="font-bold text-slate-900 truncate">{{ selectedAssignment.link_url }}</p>
-                                        <p class="text-xs text-slate-500 mt-1">External Link</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h4 class="text-sm font-bold text-slate-900 mt-8 mb-4 border-b border-slate-100 pb-3">Narrative</h4>
-                            <div class="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                                {{ selectedAssignment.description || 'No narrative provided.' }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bottom Panel: Grading Rubric -->
-                    <div class="bg-white border-t border-slate-200 p-6 shrink-0 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.05)] z-20">
-                        <div class="max-w-4xl mx-auto">
-                            <ExpertReviewForm :assignment="selectedAssignment" :template="props.defaultTemplate" />
-                        </div>
+                    <div class="space-y-2">
+                        <h3 class="text-2xl font-black text-slate-900">No programs started yet</h3>
+                        <p class="text-slate-400 font-medium max-w-sm mx-auto">Click "New Program" or choose a blueprint below to start architecturing.</p>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- ══════════════════════════════════════════
-             TAB 2 — PROGRAMS (Course Management)
-        ══════════════════════════════════════════ -->
-        <div v-if="activeMode === 'courses'" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl">
-            <!-- Welcome Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">
-                        Welcome back, {{ user?.name || 'Expert' }}
-                    </h2>
-                    <p class="text-slate-500 font-medium mt-1">Here is the bird's-eye view of your academy performance.</p>
+                <!-- Quick Blueprint Selection -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl px-10">
+                    <button v-for="temp in quickTemplates" :key="temp.title"
+                            @click="useQuickTemplate(temp)"
+                            class="flex flex-col items-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-indigo-50 hover:border-indigo-100 transition-all group">
+                        <div :class="[temp.bg, temp.color]" class="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <component :is="temp.icon" class="w-8 h-8" />
+                        </div>
+                        <span class="text-sm font-black text-slate-900 mb-1">{{ temp.title }}</span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Blueprint</span>
+                    </button>
                 </div>
-                <button @click="showCreateModal = true" 
-                        class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 transition-colors flex-shrink-0 w-max">
-                    <Plus class="w-4 h-4" /> Design New Program
+
+                <button @click="showCreateModal = true" class="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-none transition-all">
+                    Initiate Custom Program
                 </button>
             </div>
-
-            <!-- Top Metrics (3 Cards) -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Total Students -->
-                <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex items-center gap-5">
-                    <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Users class="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-500">Total Students</p>
-                        <h3 class="text-3xl font-black text-slate-900 tracking-tight">{{ expertStats.total_students }}</h3>
-                    </div>
-                </div>
-
-                <!-- Certifications Issued -->
-                <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex items-center gap-5">
-                    <div class="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Award class="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-500">Certifications Issued</p>
-                        <h3 class="text-3xl font-black text-slate-900 tracking-tight">{{ expertStats.certifications_issued }}</h3>
-                    </div>
-                </div>
-
-                <!-- Success Velocity -->
-                <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex items-center gap-5">
-                    <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <TrendingUp class="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-500">Avg. Success Velocity</p>
-                        <h3 class="text-3xl font-black text-slate-900 tracking-tight">{{ expertStats.success_velocity }}%</h3>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Program Grid -->
-            <div class="pt-2">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">Your Learning Products</h3>
-
-                <div v-if="courses?.length === 0" class="bg-white p-16 rounded-xl border border-slate-200 border-dashed text-center">
-                    <BookOpen class="text-slate-300 w-12 h-12 mx-auto mb-4" />
-                    <p class="text-slate-900 font-bold text-lg">No programs found</p>
-                    <p class="text-slate-500 text-sm mt-1 mb-6">Start building your legacy by designing your first learning program.</p>
-                    <button @click="showCreateModal = true" class="text-indigo-600 font-bold text-sm hover:text-indigo-700 hover:underline">
-                        + Design New Program
-                    </button>
-                </div>
-
-                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div v-for="course in courses" :key="course.id"
-                         class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:border-slate-300 transition-all">
-                        <!-- Card Cover -->
-                        <div class="h-40 relative bg-gradient-to-br from-indigo-900 to-purple-900 overflow-hidden">
-                            <img v-if="course.thumbnail_path" :src="'/storage/' + course.thumbnail_path"
-                                 class="w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity" />
-                            <div class="absolute top-3 left-3">
-                                <span class="bg-white/90 backdrop-blur-sm text-slate-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md shadow-sm">
-                                    {{ course?.status || 'Draft' }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Card Body -->
-                        <div class="p-5 flex flex-col flex-1">
-                            <h4 class="font-bold text-slate-900 text-lg mb-1 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                                {{ course?.title }}
-                            </h4>
-                            
-                            <div class="flex items-center gap-5 mt-3 mb-6 text-sm text-slate-500">
-                                <div class="flex items-center gap-1.5">
-                                    <Users class="w-4 h-4 text-slate-400" />
-                                    <span class="font-medium">{{ course?.enrollments_count ?? 0 }} Students</span>
-                                </div>
-                                <div class="flex items-center gap-1.5 border-l border-slate-200 pl-5">
-                                    <span class="font-bold text-slate-700">${{ (course?.price ?? 0) }}</span>
-                                </div>
-                            </div>
-
-                            <div class="mt-auto">
-                                <Link :href="route('expert.courses.builder', course.id)"
-                                      class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm">
-                                    Manage Curriculum
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- ══════════════════════════════════════════
-             TAB 3 — INSIGHTS (Participant Tracker)
-        ══════════════════════════════════════════ -->
-        <div v-if="activeMode === 'tracker'" class="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
-            <div>
-                <h3 class="text-2xl font-black text-slate-900 tracking-tight">Training Insights</h3>
-                <p class="text-slate-400 font-medium text-sm mt-0.5">Track behavioral change and performance deltas across programs.</p>
-            </div>
-
-            <div class="flex gap-6" style="min-height: 500px;">
-                <!-- Program selector -->
-                <div class="w-64 flex-shrink-0 space-y-2">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-3">Select Program</p>
-                    <button v-for="course in courses" :key="course.id"
-                            @click="selectedTrackerCourse = course"
-                            :class="selectedTrackerCourse?.id === course.id
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100'
-                                : 'bg-white text-slate-700 border-slate-100 hover:border-indigo-200 hover:shadow-sm'"
-                            class="w-full text-left px-5 py-4 rounded-2xl border transition-all duration-200 font-bold text-sm flex items-center justify-between group">
-                        <span class="truncate">{{ course?.title }}</span>
-                        <ChevronRight :class="selectedTrackerCourse?.id === course.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
-                                      class="w-4 h-4 flex-shrink-0 transition-opacity" />
-                    </button>
-                    <div v-if="!courses?.length" class="text-center py-8">
-                        <p class="text-slate-300 text-sm font-bold">No programs found.</p>
-                    </div>
-                </div>
-
-                <!-- Data panel -->
-                <div class="flex-1">
-                    <!-- Selected program table -->
-                    <div v-if="selectedTrackerCourse" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in duration-300">
-                        <!-- Table header -->
-                        <div class="px-8 py-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-                            <div>
-                                <h4 class="font-black text-slate-900">{{ selectedTrackerCourse?.title }}</h4>
-                                <p class="text-xs text-slate-400 font-medium mt-0.5">
-                                    {{ selectedTrackerCourse?.enrollments?.length ?? 0 }} participants enrolled
-                                </p>
-                            </div>
-                            <a v-if="selectedTrackerCourse?.id" :href="route('expert.courses.report', selectedTrackerCourse.id)" target="_blank"
-                               class="flex items-center gap-2 bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all">
-                                <Download class="w-3.5 h-3.5" /> Export CSV
-                            </a>
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="text-left border-b border-slate-50">
-                                        <th class="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Participant</th>
-                                        <th class="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Attendance</th>
-                                        <th class="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Pre</th>
-                                        <th class="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Post</th>
-                                        <th class="px-6 py-3.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center">Δ Delta</th>
-                                        <th class="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-50">
-                                    <tr v-if="!selectedTrackerCourse?.enrollments?.length">
-                                        <td colspan="6" class="px-8 py-16 text-center">
-                                            <Users class="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                                            <p class="text-slate-300 font-bold text-sm">No enrollments yet for this program.</p>
-                                        </td>
-                                    </tr>
-                                    <tr v-for="enrollment in selectedTrackerCourse?.enrollments" :key="enrollment.id"
-                                        class="hover:bg-indigo-50/30 transition-colors group">
-                                        <td class="px-8 py-5">
-                                            <div class="flex items-center gap-3">
-                                                <div :class="['w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0', getAvatarColor(enrollment.id)]">
-                                                    {{ getInitials(enrollment.user?.name) }}
-                                                </div>
-                                                <div>
-                                                    <p class="font-bold text-slate-900 text-sm">{{ enrollment.user?.name ?? '—' }}</p>
-                                                    <p class="text-[11px] text-slate-400 font-medium">{{ enrollment.user?.email ?? '' }}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-5 text-center">
-                                            <span :class="enrollment.attended_at ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'"
-                                                  class="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full border">
-                                                {{ enrollment.attended_at ? '✓ Attended' : 'Pending' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-5 text-center">
-                                            <span class="font-black text-slate-600 text-sm">{{ enrollment.pretest_score ?? '—' }}</span>
-                                        </td>
-                                        <td class="px-6 py-5 text-center">
-                                            <span class="font-black text-slate-600 text-sm">{{ enrollment.posttest_score ?? '—' }}</span>
-                                        </td>
-                                        <td class="px-6 py-5 text-center">
-                                            <span v-if="enrollment.score_delta != null"
-                                                  class="inline-flex items-center gap-1 text-emerald-600 font-black text-sm bg-emerald-50 px-3 py-1 rounded-full">
-                                                +{{ enrollment.score_delta }}%
-                                            </span>
-                                            <span v-else class="text-slate-300 font-bold">—</span>
-                                        </td>
-                                        <td class="px-8 py-5">
-                                            <div class="flex items-center gap-2">
-                                                <div :class="[
-                                                    'w-2 h-2 rounded-full flex-shrink-0',
-                                                    enrollment.status === 'completed' ? 'bg-emerald-500' :
-                                                    enrollment.status === 'l3_submitted' ? 'bg-amber-400' :
-                                                    'bg-slate-200'
-                                                ]"></div>
-                                                <span class="text-[11px] font-bold text-slate-600 capitalize">
-                                                    {{ (enrollment.status ?? '').replace(/_/g, ' ') }}
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Empty state (no course selected) -->
-                    <div v-else class="h-full flex flex-col items-center justify-center bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-100 p-16 text-center">
-                        <div class="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-100 shadow-sm">
-                            <BarChart3 class="w-10 h-10 text-slate-200" />
-                        </div>
-                        <h4 class="font-black text-slate-300 text-lg">Select a program</h4>
-                        <p class="text-slate-300 text-sm mt-1">Choose a program from the left to view participant analytics.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ══════════════════════════════════════════
-             MODAL — Create New Program
-        ══════════════════════════════════════════ -->
+        <!-- Create New Program Modal -->
         <Modal :show="showCreateModal" @close="showCreateModal = false" maxWidth="2xl">
             <div class="relative overflow-hidden bg-white">
-                <!-- Decorative bg -->
                 <div class="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-indigo-100 to-violet-50 rounded-full blur-3xl opacity-50 -mr-40 -mt-40 pointer-events-none"></div>
 
-                <div class="px-10 pt-10 pb-6 relative z-10">
-                    <div class="flex items-start justify-between mb-8">
+                <div class="px-10 pt-12 pb-10 relative z-10">
+                    <div class="flex items-start justify-between mb-10">
                         <div>
                             <div class="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-2">
-                                <span class="w-6 h-px bg-indigo-600"></span> New Program
+                                <span class="w-6 h-px bg-indigo-600"></span> Initiation Phase
                             </div>
-                            <h3 class="text-3xl font-black text-slate-900 tracking-tight">Design a Training Program</h3>
-                            <p class="text-slate-400 font-medium mt-1">Architect your next behavioral transformation experience.</p>
+                            <h3 class="text-3xl font-black text-slate-900 tracking-tight">Design New Program</h3>
+                            <p class="text-slate-500 font-medium mt-1">Define the core vision of your academy product.</p>
                         </div>
                         <button @click="showCreateModal = false"
-                                class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all flex-shrink-0 mt-1">
-                            <X class="w-4 h-4" />
+                                class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                            <X class="w-5 h-5" />
                         </button>
                     </div>
 
-                    <!-- AI Prompt bar -->
-                    <div class="mb-8 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-1 shadow-xl shadow-indigo-200">
-                        <div class="bg-indigo-900/30 backdrop-blur rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
-                            <div class="p-3 bg-white/10 rounded-xl border border-white/20">
-                                <Sparkles class="w-6 h-6 text-white" :class="isGeneratingAI ? 'animate-spin' : 'animate-pulse'" />
+                    <!-- AI Assistant Section -->
+                    <div class="mb-10 bg-slate-900 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent"></div>
+                        <div class="relative z-10 flex flex-col sm:flex-row items-center gap-6">
+                            <div class="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <Sparkles class="w-7 h-7 text-white" :class="isGeneratingAI ? 'animate-spin' : ''" />
                             </div>
                             <div class="flex-1 text-center sm:text-left">
-                                <p class="text-white font-black text-sm">AI Architect</p>
-                                <p class="text-indigo-200 text-xs font-medium opacity-80">Describe a topic and let AI scaffold your program.</p>
+                                <h4 class="text-white font-black text-lg">AI Architect Assistant</h4>
+                                <p class="text-indigo-200/70 text-sm font-medium">Scaffold your entire curriculum structure from a single prompt.</p>
                             </div>
-                            <div class="w-full sm:w-auto flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 border border-white/10">
-                                <input v-model="aiTopic" type="text" @keyup.enter="generateWithAI"
-                                       placeholder="e.g. Leadership, Data Analysis…"
-                                       class="bg-transparent border-none text-white text-sm placeholder-white/40 font-medium focus:ring-0 w-full sm:w-40 outline-none" />
-                                <button @click="generateWithAI" :disabled="isGeneratingAI"
-                                        class="bg-white text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-50 transition-all disabled:opacity-50 whitespace-nowrap">
-                                    <Loader2 v-if="isGeneratingAI" class="w-3.5 h-3.5 animate-spin" />
-                                    <span v-else>Generate</span>
-                                </button>
-                            </div>
+                        </div>
+                        <div class="mt-6 flex items-center gap-3 bg-white/10 rounded-2xl p-2 border border-white/10">
+                            <input v-model="aiTopic" type="text" @keyup.enter="generateWithAI"
+                                   placeholder="What do you want to teach?" 
+                                   class="bg-transparent border-none text-white text-sm placeholder-white/30 font-medium focus:ring-0 w-full px-4 outline-none" />
+                            <button @click="generateWithAI" :disabled="isGeneratingAI"
+                                    class="bg-white text-slate-900 px-6 py-2.5 rounded-xl text-xs font-black hover:bg-indigo-400 hover:text-white transition-all disabled:opacity-50">
+                                <span v-if="!isGeneratingAI">Scaffold</span>
+                                <Loader2 v-else class="w-4 h-4 animate-spin" />
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Form -->
-                    <form @submit.prevent="submitCreateCourse" class="space-y-6">
-                        <div>
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Program Title</label>
+                    <form @submit.prevent="submitCreateCourse" class="space-y-8">
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Program Title</label>
                             <input v-model="createForm.title" type="text" required
-                                   class="w-full px-5 py-4 rounded-xl border-2 border-slate-100 bg-slate-50 focus:border-indigo-400 focus:bg-white transition-all font-bold text-slate-900 outline-none text-lg"
-                                   placeholder="e.g. Strategic Leadership 2026" />
-                            <InputError :message="createForm.errors.title" class="mt-2" />
+                                   class="w-full px-6 py-4 rounded-2xl border-none bg-slate-50 focus:ring-8 focus:ring-indigo-50 focus:bg-white transition-all font-bold text-slate-900 outline-none shadow-inner"
+                                   placeholder="e.g. Masterclass: System Architecture" />
+                            <InputError :message="createForm.errors.title" />
                         </div>
 
-                        <div>
-                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vision & Description</label>
-                            <textarea v-model="createForm.description" required rows="3"
-                                      class="w-full px-5 py-4 rounded-xl border-2 border-slate-100 bg-slate-50 focus:border-indigo-400 focus:bg-white transition-all font-medium text-slate-700 resize-none outline-none"
-                                      placeholder="What behavioral transformation will participants achieve?"></textarea>
-                            <InputError :message="createForm.errors.description" class="mt-2" />
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Vision Statement</label>
+                            <textarea v-model="createForm.description" required rows="4"
+                                      class="w-full px-6 py-4 rounded-2xl border-none bg-slate-50 focus:ring-8 focus:ring-indigo-50 focus:bg-white transition-all font-medium text-slate-700 resize-none outline-none shadow-inner"
+                                      placeholder="Describe the impact this program will have on participants..."></textarea>
+                            <InputError :message="createForm.errors.description" />
                         </div>
 
-                        <div class="grid grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Passing Grade (%)</label>
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Passing Grade (%)</label>
                                 <input v-model="createForm.passing_grade" type="number" min="0" max="100" required
-                                       class="w-full px-5 py-4 rounded-xl border-2 border-slate-100 bg-slate-50 focus:border-indigo-400 focus:bg-white transition-all font-black text-xl text-slate-900 outline-none" />
-                                <InputError :message="createForm.errors.passing_grade" class="mt-2" />
+                                       class="w-full px-6 py-4 rounded-2xl border-none bg-slate-50 focus:ring-8 focus:ring-indigo-50 focus:bg-white transition-all font-black text-xl text-slate-900 outline-none shadow-inner" />
+                                <InputError :message="createForm.errors.passing_grade" />
                             </div>
                             <div class="flex items-end">
                                 <button type="submit" :disabled="createForm.processing"
-                                        class="w-full py-4 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50">
-                                    {{ createForm.processing ? 'Creating…' : 'Create Program' }}
+                                        class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-2xl shadow-indigo-200 hover:bg-slate-900 hover:shadow-none transition-all active:scale-95 disabled:opacity-50">
+                                    {{ createForm.processing ? 'Designing...' : 'Launch Designer' }}
                                 </button>
                             </div>
                         </div>
@@ -635,6 +378,6 @@ const getAvatarColor = (id) => avatarColors[(id || 0) % avatarColors.length];
 </template>
 
 <style scoped>
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; line-clamp: 1; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-clamp: 2; }
 </style>

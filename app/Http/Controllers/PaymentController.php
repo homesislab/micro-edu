@@ -56,7 +56,7 @@ class PaymentController extends Controller
         Enrollment::create([
             'user_id' => $user->id,
             'course_id' => $course->id,
-            'status' => 'active',
+            'status' => 'enrolled',
         ]);
 
         return redirect()->route('dashboard')->with('success', 'Pembayaran Berhasil! Kelas ' . $course->title . ' telah ditambahkan ke dashboard Anda.');

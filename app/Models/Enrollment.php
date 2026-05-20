@@ -84,9 +84,9 @@ class Enrollment extends Model
     {
         // 1. Check L2 Mastery (Knowledge items marked as mastery)
         $masteryItems = $this->course->modules()
-            ->with('items')
+            ->with('curriculumItems')
             ->get()
-            ->flatMap->items
+            ->flatMap->curriculumItems
             ->where('type', 'knowledge')
             ->where('assessment_mode', 'mastery');
 
@@ -103,9 +103,9 @@ class Enrollment extends Model
 
         // 2. Check L3 Behavior (Exercise items)
         $exerciseItems = $this->course->modules()
-            ->with('items')
+            ->with('curriculumItems')
             ->get()
-            ->flatMap->items
+            ->flatMap->curriculumItems
             ->where('type', 'exercise');
 
         foreach ($exerciseItems as $item) {

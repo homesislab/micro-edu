@@ -13,18 +13,20 @@ class Course extends Model
     use AcademyScoped, LogsActivity;
 
     protected $fillable = [
-        'title', 
-        'description', 
-        'expert_id', 
-        'passing_grade', 
-        'status', 
-        'price', 
-        'thumbnail_path', 
-        'attendance_code', 
-        'zoom_link', 
-        'event_time', 
-        'is_recording_available', 
-        'recording_url', 
+        'title',
+        'description',
+        'expert_id',
+        'passing_grade',
+        'fast_track_threshold',
+        'status',
+        'price',
+        'is_premium',
+        'thumbnail_path',
+        'attendance_code',
+        'zoom_link',
+        'event_time',
+        'is_recording_available',
+        'recording_url',
         'academy_id'
     ];
     public function academy()

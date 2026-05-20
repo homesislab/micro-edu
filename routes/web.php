@@ -76,7 +76,7 @@ Route::middleware(['auth'])->group(function () {
             $props = [
                 'enrollments' => Enrollment::where('user_id', $user->id)->with('course')->get(),
                 'certificates' => \App\Models\UserCertificate::where('user_id', $user->id)->with('course')->get(),
-                'availableCourses' => Course::where('is_public', true)->limit(5)->get(),
+                'availableCourses' => Course::where('status', 'published')->limit(5)->get(),
                 'leaderboard' => User::orderBy('points', 'desc')->limit(10)->get(),
             ];
 
@@ -186,11 +186,13 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/courses/{course}/modules', [ExpertController::class, 'storeModule'])->name('expert.modules.store');
             Route::patch('/modules/{module}', [ExpertController::class, 'updateModule'])->name('expert.modules.update');
             Route::delete('/modules/{module}', [ExpertController::class, 'deleteModule'])->name('expert.modules.delete');
+            Route::post('/courses/{course}/modules/reorder', [ExpertController::class, 'reorderModules'])->name('expert.modules.reorder');
 
             // Architect Studio: Items
             Route::post('/courses/{course}/items', [ExpertController::class, 'storeItem'])->name('expert.items.store');
             Route::patch('/items/{item}', [ExpertController::class, 'updateItem'])->name('expert.items.update');
             Route::delete('/items/{item}', [ExpertController::class, 'deleteItem'])->name('expert.items.delete');
+            Route::post('/modules/{module}/items/reorder', [ExpertController::class, 'reorderItems'])->name('expert.items.reorder');
         });
     });
 });

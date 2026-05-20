@@ -140,7 +140,7 @@ const deleteTemplate = (id) => {
                     <div class="flex items-center justify-between pt-6 border-t border-slate-50">
                         <div class="text-left">
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total Value</p>
-                            <p class="text-lg font-black text-slate-900">{{ template.criteria_json.reduce((s, c) => s + c.points, 0) }} Pts</p>
+                            <p class="text-lg font-black text-slate-900">{{ template.criteria_json.reduce((s, c) => s + (Number(c.points) || 0), 0) }} Pts</p>
                         </div>
                         <ArrowRight class="w-5 h-5 text-slate-200 group-hover:text-emerald-600 group-hover:translate-x-2 transition-all" />
                     </div>

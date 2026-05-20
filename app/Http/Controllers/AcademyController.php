@@ -13,19 +13,26 @@ use Inertia\Inertia;
 class AcademyController extends Controller
 {
     /**
-     * Display the Academy Lobby where users choose their workspace.
+     * Display the Academy Lobby — an explicit workspace switcher for multi-academy users.
+     * Single-academy users are bypassed directly to dashboard via CheckAcademy middleware.
      */
     public function lobby()
     {
-        // Clear active academy context when returning to the lobby
-        session()->forget('active_academy_id');
-
         $user = auth()->user();
-        $academies = $user->academies()->get();
+        $academies = $user->academies()
+            ->withPivot('role', 'last_accessed_at')
+            ->orderByPivot('last_accessed_at', 'desc')
+            ->get();
+
+        // Only clear active context if the user explicitly navigated to the lobby
+        // (i.e., they have multiple academies to switch between)
+        if ($academies->count() > 1) {
+            session()->forget('active_academy_id');
+        }
 
         return Inertia::render('Academy/Lobby', [
             'academies' => $academies,
-            'user' => $user
+            'user'      => $user,
         ]);
     }
 

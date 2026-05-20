@@ -8,6 +8,7 @@ use App\Models\CourseMaterial;
 use App\Models\Module;
 use App\Models\CurriculumItem;
 use App\Models\EvaluationL3Assignment;
+use App\Models\Enrollment;
 use App\Models\QuizTemplate;
 use App\Models\TestQuestion;
 use App\Models\RubricTemplate;
@@ -79,7 +80,6 @@ class ExpertController extends Controller
         // Fetch expert's courses with enrollment counts and section info
         $courses = Course::where('expert_id', $expert->id)
             ->withCount('enrollments')
-            ->with(['section:id,name'])
             ->get()
             ->map(function ($course) {
                 return [
@@ -88,7 +88,6 @@ class ExpertController extends Controller
                     'description' => $course->description,
                     'price' => $course->price ?? 0,
                     'enrollments_count' => $course->enrollments_count,
-                    'section' => $course->section,
                     'created_at' => $course->created_at,
                     'updated_at' => $course->updated_at,
                 ];
@@ -112,20 +111,16 @@ class ExpertController extends Controller
      */
     private function calculateSuccessVelocity($expertId)
     {
-        $courses = Course::where('expert_id', $expertId)->get();
-        
-        if ($courses->isEmpty()) {
+        $courseIds = Course::where('expert_id', $expertId)->pluck('id');
+
+        if ($courseIds->isEmpty()) {
             return 0;
         }
 
-        $totalEnrollments = 0;
-        $completedEnrollments = 0;
-
-        foreach ($courses as $course) {
-            $enrollments = $course->enrollments()->get();
-            $totalEnrollments += $enrollments->count();
-            $completedEnrollments += $enrollments->where('status', 'completed')->count();
-        }
+        $totalEnrollments = Enrollment::whereIn('course_id', $courseIds)->count();
+        $completedEnrollments = Enrollment::whereIn('course_id', $courseIds)
+            ->where('status', 'completed')
+            ->count();
 
         if ($totalEnrollments === 0) {
             return 0;
@@ -172,7 +167,6 @@ class ExpertController extends Controller
             'description' => $validated['description'],
             'passing_grade' => $validated['passing_grade'],
             'expert_id' => auth()->id(),
-            'organization_id' => auth()->user()->organization_id,
             'status' => 'draft',
         ]);
 
@@ -337,6 +331,10 @@ class ExpertController extends Controller
             $contentValue = (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
                 ? $decoded
                 : ['body' => $rawContent];
+                
+            if ($request->has('inline_questions')) {
+                $contentValue['questions'] = $request->input('inline_questions');
+            }
         }
 
         CurriculumItem::create([
@@ -379,6 +377,10 @@ class ExpertController extends Controller
             $contentValue = (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
                 ? $decoded
                 : ['body' => $rawContent];
+                
+            if ($request->has('inline_questions')) {
+                $contentValue['questions'] = $request->input('inline_questions');
+            }
         }
 
         $item->update([
@@ -403,6 +405,43 @@ class ExpertController extends Controller
 
         $item->delete();
         return back();
+    }
+
+    public function reorderModules(Request $request, Course $course)
+    {
+        $this->assertCourseOwner($course);
+
+        $request->validate([
+            'modules'       => 'required|array',
+            'modules.*.id'  => 'required|exists:modules,id',
+            'modules.*.order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->modules as $mod) {
+            \App\Models\Module::where('id', $mod['id'])->update(['order' => $mod['order']]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function reorderItems(Request $request, \App\Models\Module $module)
+    {
+        // Security: ensure the user owns the module's course
+        if ($module->course->expert_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'items'         => 'required|array',
+            'items.*.id'    => 'required|exists:curriculum_items,id',
+            'items.*.order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->items as $itemData) {
+            CurriculumItem::where('id', $itemData['id'])->update(['order' => $itemData['order']]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function storeQuestion(Request $request, Course $course)
@@ -489,10 +528,11 @@ class ExpertController extends Controller
         $this->assertCourseOwner($course);
 
         $validated = $request->validate([
-            'attendance_code' => 'nullable|string|max:50',
-            'zoom_link' => 'nullable|url',
-            'event_time' => 'nullable|date',
-            'passing_grade' => 'required|integer|min:0|max:100',
+            'attendance_code'      => 'nullable|string|max:50',
+            'zoom_link'            => 'nullable|url',
+            'event_time'           => 'nullable|date',
+            'passing_grade'        => 'required|integer|min:0|max:100',
+            'fast_track_threshold' => 'nullable|integer|min:0|max:100',
         ]);
 
         $course->update($validated);
@@ -668,7 +708,9 @@ class ExpertController extends Controller
 
     public function updateRubricTemplate(Request $request, RubricTemplate $template)
     {
-        $this->assertCourseOwner($template->expert_id); // Reusing ownership logic
+        if ($template->expert_id !== auth()->id()) {
+            abort(403);
+        }
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -683,7 +725,9 @@ class ExpertController extends Controller
 
     public function deleteRubricTemplate(RubricTemplate $template)
     {
-        $this->assertCourseOwner($template->expert_id);
+        if ($template->expert_id !== auth()->id()) {
+            abort(403);
+        }
         $template->delete();
         return back()->with('success', 'Rubric template removed from library.');
     }

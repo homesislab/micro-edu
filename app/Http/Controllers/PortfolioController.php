@@ -35,12 +35,14 @@ class PortfolioController extends Controller
         // Fetch Proof of Work (Approved Kirkpatrick L3 Assignments)
         $proofs = Enrollment::withoutGlobalScopes()
             ->where('user_id', $user->id)
-            ->whereHas('l3Assignment', function($query) {
+            ->whereHas('l3Assignments', function($query) {
                 $query->where('status', 'approved');
             })
             ->with(['course' => function($query) {
                 $query->withoutGlobalScopes();
-            }, 'l3Assignment'])
+            }, 'l3Assignments' => function($query) {
+                $query->where('status', 'approved')->with('curriculumItem');
+            }])
             ->get();
 
         return Inertia::render('Social/Portfolio', [

@@ -6,57 +6,41 @@ import {
     ChevronDown, 
     CheckCircle2, 
     Lock, 
-    Play, 
-    FileText, 
-    HelpCircle, 
     Target, 
     UploadCloud,
-    MoreHorizontal,
+    Rocket,
     Check
 } from 'lucide-vue-next';
 
-const props = defineProps({
-    course: {
-        type: Object,
-        default: () => ({
-            title: 'Advanced SEO & Holistic Strategy',
-            progress: 45,
-            modules: [
-                {
-                    id: 1,
-                    title: 'Foundations of Advanced SEO',
-                    expanded: true,
-                    items: [
-                        { id: 101, title: 'Evolving Search Landscape', type: 'literal', status: 'completed' },
-                        { id: 102, title: 'Technical SEO Deep Dive', type: 'visual', status: 'active' },
-                        { id: 103, title: 'Algorithm Trends 2026', type: 'knowledge', status: 'locked' }
-                    ]
-                },
-                {
-                    id: 2,
-                    title: 'Content & Semantic Intelligence',
-                    expanded: false,
-                    items: [
-                        { id: 201, title: 'Semantic Keyword Research', type: 'visual', status: 'locked' },
-                        { id: 202, title: 'AI Content Orchestration', type: 'literal', status: 'locked' },
-                        { id: 203, title: 'Final Mission: SEO Audit', type: 'exercise', status: 'locked' }
-                    ]
-                }
+// Dummy Gamification Course Data
+const course = ref({
+    title: 'Advanced SEO Mastery',
+    progress: 60,
+    modules: [
+        {
+            id: 1,
+            title: 'Module 1: Fundamental',
+            expanded: false,
+            items: [
+                { id: 101, title: 'Understanding Crawl Budget', type: 'visual', status: 'completed' },
             ]
-        })
-    }
+        },
+        {
+            id: 2,
+            title: 'Module 2: Advanced Execution',
+            expanded: true,
+            items: [
+                { id: 201, title: 'Understanding Crawl Budget', type: 'literal', status: 'completed' },
+                { id: 202, title: 'FINAL MISSION: Create SEO Audit Report', type: 'exercise', status: 'active', hasQuizHealth: true },
+                { id: 203, title: 'Understanding Crawl Budget', type: 'knowledge', status: 'locked' },
+                { id: 204, title: 'Actionable Recommendations', type: 'visual', status: 'locked' }
+            ]
+        }
+    ]
 });
 
-const activeItemId = ref(102);
-const expandedModules = ref([1]);
-
-const activeItem = computed(() => {
-    for (const mod of props.course.modules) {
-        const item = mod.items.find(i => i.id === activeItemId.value);
-        if (item) return item;
-    }
-    return null;
-});
+const activeItemId = ref(202);
+const expandedModules = ref([2]);
 
 const toggleModule = (id) => {
     if (expandedModules.value.includes(id)) {
@@ -72,215 +56,226 @@ const selectItem = (item) => {
     }
 };
 
-const getItemIcon = (type) => {
-    switch (type) {
-        case 'visual': return Play;
-        case 'knowledge': return HelpCircle;
-        case 'exercise': return Target;
-        default: return FileText;
+const getStatusClasses = (item) => {
+    if (item.id === activeItemId.value) {
+        return 'bg-indigo-50 border-indigo-200 text-indigo-900 border font-semibold shadow-sm';
     }
+    if (item.status === 'locked') {
+        return 'text-slate-400 opacity-60 cursor-not-allowed';
+    }
+    if (item.status === 'completed') {
+        return 'text-slate-700 hover:bg-slate-50';
+    }
+    return 'text-slate-600 hover:bg-slate-50';
 };
-
-const rubrics = [
-    { label: 'Technical Accuracy', desc: 'Expert will verify your site architecture findings.' },
-    { label: 'Strategic Completeness', desc: 'Comprehensive coverage of E-E-A-T factors.' },
-    { label: 'Actionable Insights', desc: 'Quality of recommendations provided to the client.' }
-];
-
 </script>
 
 <template>
     <Head title="Learner Classroom" />
 
-    <div class="h-screen flex bg-white overflow-hidden font-sans">
+    <div class="h-screen flex bg-white font-sans overflow-hidden">
         
         <!-- Sidebar Kiri: Curriculum Map -->
-        <aside class="w-80 flex-shrink-0 border-r border-slate-100 flex flex-col h-full bg-white z-20">
-            <!-- Header Sidebar -->
-            <div class="p-6 border-b border-slate-50">
-                <Link :href="'/dashboard'" class="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors mb-6 group">
-                    <ChevronLeft class="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    <span class="text-[10px] font-black uppercase tracking-widest">Lobby Academy</span>
-                </Link>
-                
-                <h1 class="text-lg font-black text-slate-900 leading-tight mb-4">{{ course.title }}</h1>
-                
-                <!-- Progress Bar -->
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-tighter">
-                        <span class="text-slate-400">Course Progress</span>
-                        <span class="text-indigo-600">{{ course.progress }}%</span>
+        <aside class="w-80 flex-shrink-0 border-r border-slate-200 flex flex-col h-full bg-white z-20 shadow-[2px_0_10px_rgba(0,0,0,0.02)]">
+            
+            <!-- Navbar Header -->
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white text-slate-800">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center shadow-md">
+                        <span class="text-white font-black text-sm">M</span>
                     </div>
-                    <div class="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                        <div class="h-full bg-indigo-600 rounded-full transition-all duration-1000" :style="{ width: course.progress + '%' }"></div>
+                    <span class="font-black text-lg tracking-tight">MicroEducate</span>
+                </div>
+            </div>
+
+            <!-- Header Sidebar (Progress) -->
+            <div class="p-6 border-b border-slate-100">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight">Course</p>
+                        <h1 class="text-base font-black text-slate-900 leading-tight pr-4">{{ course.title }}</h1>
+                    </div>
+                    
+                    <!-- Progress Tracking (Donut Chart) -->
+                    <div class="relative w-16 h-16 flex-shrink-0">
+                        <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                            <!-- Background Circle -->
+                            <path class="text-slate-100" stroke-width="4" stroke="currentColor" fill="none"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <!-- Progress Circle -->
+                            <path class="text-indigo-600 drop-shadow-md transition-all duration-1000 ease-out" stroke-dasharray="100, 100" stroke-width="4" stroke="currentColor" fill="none"
+                                :stroke-dashoffset="100 - course.progress"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-xs font-black text-slate-900 leading-none">{{ course.progress }}%</span>
+                            <span class="text-[6px] font-bold text-slate-500 uppercase">Complete</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Curriculum Navigation -->
-            <nav class="flex-1 overflow-y-auto p-4 space-y-4">
-                <div v-for="(mod, mIdx) in course.modules" :key="mod.id" class="space-y-1">
-                    <!-- Module Accordion Header -->
+            <nav class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                <div v-for="mod in course.modules" :key="mod.id" class="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                    <!-- Module Header -->
                     <button @click="toggleModule(mod.id)"
-                            class="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all group">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-[10px]">
-                                {{ mIdx + 1 }}
-                            </div>
-                            <span class="text-xs font-black text-slate-900 tracking-tight text-left">{{ mod.title }}</span>
+                            class="w-full flex items-center justify-between p-4 bg-white hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center gap-2">
+                             <CheckCircle2 v-if="mod.id === 1" class="w-4 h-4 text-slate-300" />
+                             <div v-else class="w-4 h-4">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-400">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                </svg>
+                             </div>
+                            <span class="text-xs font-black text-slate-800">{{ mod.title }}</span>
                         </div>
-                        <ChevronDown :class="{ 'rotate-180': expandedModules.includes(mod.id) }" class="w-4 h-4 text-slate-300 transition-transform" />
+                        <ChevronDown :class="{ 'rotate-180': expandedModules.includes(mod.id) }" class="w-4 h-4 text-slate-400 transition-transform" />
                     </button>
 
                     <!-- Items List -->
-                    <div v-show="expandedModules.includes(mod.id)" class="px-2 space-y-1 animate-in slide-in-from-top-1 duration-300">
+                    <div v-show="expandedModules.includes(mod.id)" class="px-2 pb-2 space-y-1 bg-white border-t border-slate-50">
                         <button v-for="item in mod.items" :key="item.id"
                                 @click="selectItem(item)"
                                 :disabled="item.status === 'locked'"
                                 :class="[
-                                    'w-full flex items-center justify-between p-3 rounded-xl transition-all',
-                                    item.id === activeItemId ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50',
-                                    item.status === 'locked' ? 'opacity-50 cursor-not-allowed' : ''
-                                ]"
-                                class="relative group">
+                                    'w-full flex items-center justify-between p-3 rounded-xl transition-all text-left mt-1',
+                                    getStatusClasses(item)
+                                ]">
                             
                             <div class="flex items-center gap-3">
-                                <div :class="item.id === activeItemId ? 'bg-white shadow-sm' : 'bg-slate-50'" class="w-7 h-7 rounded-lg flex items-center justify-center">
-                                    <component :is="getItemIcon(item.type)" :class="item.status === 'locked' ? 'text-slate-300' : (item.id === activeItemId ? 'text-indigo-600' : 'text-slate-400')" class="w-4 h-4" />
-                                </div>
-                                <span :class="item.id === activeItemId ? 'font-black' : 'font-bold'" class="text-[11px] text-left">{{ item.title }}</span>
+                                <!-- Icon Status Indikator Kiri -->
+                                <CheckCircle2 v-if="item.status === 'completed'" class="w-5 h-5 text-emerald-500 fill-emerald-100/50 flex-shrink-0" />
+                                <Target v-else-if="item.id === activeItemId" class="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                                <Lock v-else-if="item.status === 'locked'" class="w-4 h-4 text-slate-300 ml-0.5 flex-shrink-0" />
+                                <div v-else class="w-5 h-5 ml-0.5"></div>
+
+                                <span class="text-xs pr-2" :class="item.id === activeItemId ? 'font-black text-indigo-900' : (item.status === 'locked' ? 'font-medium' : 'font-bold')">{{ item.title }}</span>
                             </div>
 
-                            <div class="flex items-center">
-                                <CheckCircle2 v-if="item.status === 'completed'" class="w-4 h-4 text-emerald-500" />
-                                <div v-else-if="item.id === activeItemId" class="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse mr-1"></div>
-                                <Lock v-else-if="item.status === 'locked'" class="w-3 h-3 text-slate-300" />
+                            <!-- Indikator Kanan: Quiz Health dot (Gamification trick) -->
+                            <div v-if="item.hasQuizHealth" class="flex flex-col items-center justify-center flex-shrink-0 ml-1">
+                                <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full mb-0.5 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>
+                                <span class="text-[8px] font-black text-emerald-600 leading-none">Quiz<br/>Health</span>
                             </div>
+                            <Lock v-else-if="item.status === 'locked'" class="w-4 h-4 text-slate-300 flex-shrink-0" />
                         </button>
                     </div>
                 </div>
             </nav>
-
-            <!-- Bottom Actions -->
-            <div class="p-6 border-t border-slate-50">
-                <button class="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 border border-slate-100">
-                            <MoreHorizontal class="w-4 h-4" />
-                        </div>
-                        <span class="text-[10px] font-black uppercase text-slate-500">Resource Files</span>
-                    </div>
-                </button>
-            </div>
         </aside>
 
-        <!-- Kanvas Kanan: Content Area -->
-        <main class="flex-1 bg-slate-50 overflow-y-auto relative p-12">
+        <!-- Kanvas Kanan: Content Area (Theater View) -->
+        <main class="flex-1 bg-slate-50/50 overflow-y-auto relative py-12 px-8">
             
-            <!-- Focus Header (Item Title) -->
-            <div class="max-w-4xl mx-auto mb-10 flex items-center justify-between">
-                <div>
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight mb-2">{{ activeItem?.title }}</h2>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">Unit 0{{ activeItem?.id.toString().slice(-1) }}</span>
-                        <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
-                        <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Curriculum Pillar: Holistic SEO</span>
-                    </div>
-                </div>
-                <!-- Support/Context Button? -->
-            </div>
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-lg font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
+                    Exercise
+                </h2>
 
-            <!-- Content Container -->
-            <div class="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                
-                <!-- Mockup: Exercise/Mission Canvas -->
-                <div v-if="activeItem?.type === 'exercise' || true">
-                    <div class="space-y-8">
-                        
-                        <!-- Mission Card -->
-                        <div class="bg-white rounded-[3rem] border border-slate-100 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.05)] overflow-hidden">
-                            <div class="p-12">
-                                <div class="bg-indigo-600 w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-2xl shadow-indigo-200 mb-8">
-                                    <Target class="w-8 h-8 text-white" />
-                                </div>
-                                <h3 class="text-2xl font-black text-slate-900 mb-4 tracking-tight">Final Mission: Create SEO Audit Report</h3>
-                                <p class="text-slate-500 font-medium leading-relaxed mb-10">
-                                    Analyze the provided case study website and generate a comprehensive SEO audit report. You must address technical performance, semantic structure, and backlink health. Use the templates provided in the resource section.
-                                </p>
-
-                                <div class="h-px bg-slate-50 mb-10"></div>
-
-                                <!-- Evaluation Rubric -->
-                                <div class="space-y-6 mb-12">
-                                    <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-400">Expert Grading Rubric</h4>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div v-for="rubric in rubrics" :key="rubric.label" class="p-6 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-200 hover:bg-indigo-50/30 transition-all duration-300">
-                                            <div class="flex items-center gap-3 mb-2">
-                                                <div class="w-5 h-5 bg-white border border-slate-200 rounded-md flex items-center justify-center text-slate-300 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
-                                                    <Check class="w-3 h-3" />
-                                                </div>
-                                                <span class="text-[11px] font-black text-slate-900">{{ rubric.label }}</span>
-                                            </div>
-                                            <p class="text-[10px] text-slate-400 font-bold leading-relaxed ml-8">{{ rubric.desc }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Submission Area -->
-                                <div class="space-y-6">
-                                    <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-400">Your Submission</h4>
-                                    <div class="border-4 border-dashed border-slate-100 rounded-[2.5rem] p-16 text-center group hover:border-indigo-200 hover:bg-slate-50/50 transition-all cursor-pointer relative overflow-hidden">
-                                        <div class="relative z-10">
-                                            <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-indigo-50 transition-all duration-500">
-                                                <UploadCloud class="w-10 h-10 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-                                            </div>
-                                            <p class="text-sm font-black text-slate-900 mb-2">Drag and drop your mission file here</p>
-                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Accepted: PDF, DOCX, ZIP (Max 50MB)</p>
-                                        </div>
-                                        <div class="absolute inset-0 bg-indigo-50 opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Footer Actions -->
-                            <div class="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
-                                <button class="bg-indigo-600 hover:bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-sm shadow-2xl shadow-indigo-200 hover:shadow-slate-200 transition-all active:scale-95 flex items-center gap-3 group">
-                                    Submit Mission for Review
-                                    <CheckCircle2 class="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                </button>
+                <!-- Exercise Module Canvas -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    
+                    <div class="p-10 space-y-8">
+                        <!-- Mission Header -->
+                        <div class="flex items-start justify-between border-b border-slate-100 pb-6">
+                            <h3 class="text-2xl font-black text-slate-900 tracking-tight">Final Mission: Create SEO Audit Report</h3>
+                            <div class="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 text-xs font-bold whitespace-nowrap shadow-sm">
+                                Kirkpartick L3: In Progress
                             </div>
                         </div>
 
+                        <!-- Instructions -->
+                        <div>
+                            <h4 class="text-sm font-black text-slate-800 mb-3">Instructions</h4>
+                            <p class="text-slate-600 text-sm leading-relaxed">
+                                Develop a comprehensive SEO audit report for your website, focusing on technical issues, on-page factors, and competitive landscape. Max 10 pages.
+                            </p>
+                        </div>
+
+                        <!-- Evaluation Rubric -->
+                        <div>
+                            <h4 class="text-sm font-black text-slate-800 mb-4">Evaluation Rubric (Expert Graded)</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                        <span class="text-slate-700 font-medium">Technical Audit Accuracy</span>
+                                    </div>
+                                    <span class="font-bold text-slate-900">20 pts</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                        <span class="text-slate-700 font-medium">Competitor Analysis Depth</span>
+                                    </div>
+                                    <span class="font-bold text-slate-900">30 pts</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                        <span class="text-slate-700 font-medium">Actionable Recommendations</span>
+                                    </div>
+                                    <span class="font-bold text-slate-900">40 pts</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1 h-1 bg-slate-400 rounded-full"></div>
+                                        <span class="text-slate-700 font-medium">Report Professionalism</span>
+                                    </div>
+                                    <span class="font-bold text-slate-900">10 pts</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-3 border-t border-slate-100 mt-2">
+                                    <span class="font-black text-slate-900 text-sm">Sumi</span> <!-- Tidy up Sum/Total -->
+                                    <span class="font-black text-slate-900 text-sm">100 pts</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submission Zone -->
+                        <div>
+                            <h4 class="text-sm font-black text-slate-800 mb-4">Submission Zone</h4>
+                            <div class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
+                                <UploadCloud class="w-10 h-10 text-slate-400 mx-auto mb-3 group-hover:scale-110 group-hover:text-indigo-500 transition-all duration-300" />
+                                <p class="text-sm font-bold text-slate-900 mb-1">Drag & drop your SEO Audit Report here</p>
+                                <p class="text-xs text-indigo-600 font-semibold mb-3 underline underline-offset-2">click to upload</p>
+                                <p class="text-[10px] text-slate-500 font-medium">Supported file types: PDF, DOCX, maximum 25 MB</p>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Footer Support -->
-                <div class="mt-20 text-center pb-20">
-                    <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest">MicroEducate Focus Mode &bull; Design by Antigravity</p>
-                </div>
+                    <!-- Bottom Action Bar -->
+                    <div class="bg-slate-50/80 px-10 py-5 border-t border-slate-100 flex items-center justify-between">
+                        <button class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95">
+                            Save Progress
+                        </button>
+                        
+                        <button class="px-6 py-2.5 bg-[#4F39F6] hover:bg-[#3d2bd1] text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-2">
+                            <Rocket class="w-4 h-4" />
+                            Submit Mission for Expert Review
+                        </button>
+                    </div>
 
+                </div>
             </div>
         </main>
     </div>
 </template>
 
 <style scoped>
-.animate-in {
-    animation-delay: 0.2s;
-}
-
-/* Custom scrollbar for sidebar */
-nav::-webkit-scrollbar {
+.custom-scrollbar::-webkit-scrollbar {
     width: 4px;
 }
-nav::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }
-nav::-webkit-scrollbar-thumb {
-    background: #f1f5f9;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
     border-radius: 10px;
 }
-nav::-webkit-scrollbar-thumb:hover {
-    background: #e2e8f0;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
 }
 </style>

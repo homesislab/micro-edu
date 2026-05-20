@@ -18,39 +18,55 @@ class AIController extends Controller
 
     public function generateCurriculum(Request $request, Course $course, AIService $aiService)
     {
+        if ($course->expert_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $prompt = $request->input('prompt');
+
         if ($request->boolean('preview')) {
             try {
-                $modules = $aiService->generateCurriculumModules($course, $request->input('prompt'));
+                $modules = $aiService->generateCurriculumModules($course, $prompt);
                 return response()->json($modules);
             } catch (\Exception $e) {
                 return response()->json(['error' => $e->getMessage()], 500);
             }
         }
 
-        // Batch generate modules
+        // If modules were pre-built and passed directly (batch commit from preview)
         $modules = $request->input('modules', []);
-        
-        foreach ($modules as $mIndex => $moduleData) {
-            $module = $course->modules()->create([
-                'title' => $moduleData['title'] ?? 'Module ' . ($mIndex + 1),
-                'description' => $moduleData['description'] ?? null,
-                'order' => $mIndex,
-            ]);
 
-            if (isset($moduleData['items']) && is_array($moduleData['items'])) {
-                foreach ($moduleData['items'] as $iIndex => $itemData) {
-                    $module->curriculumItems()->create([
-                        'title' => $itemData['title'] ?? 'Item ' . ($iIndex + 1),
-                        'type' => $itemData['type'] ?? 'literal',
-                        'content' => is_array($itemData['content']) ? json_encode($itemData['content']) : ($itemData['content'] ?? ''),
-                        'rubric_json' => $itemData['rubric_json'] ?? null,
-                        'order' => $iIndex,
-                    ]);
-                }
+        // If no pre-built modules provided, call AI directly
+        if (empty($modules)) {
+            try {
+                $modules = $aiService->generateCurriculumModules($course, $prompt);
+            } catch (\Exception $e) {
+                return back()->with('error', 'AI generation failed: ' . $e->getMessage());
             }
         }
 
-        return back()->with('success', 'AI Architect has generated ' . count($modules) . ' modules for you!');
+        $count = 0;
+        foreach ($modules as $mIndex => $moduleData) {
+            $module = $course->modules()->create([
+                'title'       => $moduleData['title'] ?? 'Module ' . ($mIndex + 1),
+                'description' => $moduleData['description'] ?? null,
+                'order'       => $mIndex,
+            ]);
+
+            $items = $moduleData['items'] ?? [];
+            foreach ($items as $iIndex => $itemData) {
+                $module->curriculumItems()->create([
+                    'title'      => $itemData['title'] ?? 'Item ' . ($iIndex + 1),
+                    'type'       => $itemData['type'] ?? 'literal',
+                    'content'    => is_array($itemData['content']) ? json_encode($itemData['content']) : ($itemData['content'] ?? ''),
+                    'rubric_json'=> $itemData['rubric_json'] ?? null,
+                    'order'      => $iIndex,
+                ]);
+            }
+            $count++;
+        }
+
+        return back()->with('success', "AI Architect has generated {$count} modules for your program!");
     }
 
     public function generateQuestions(Course $course, AIService $aiService)

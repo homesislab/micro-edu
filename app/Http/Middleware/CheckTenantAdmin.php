@@ -15,7 +15,8 @@ class CheckTenantAdmin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (auth()->check() && auth()->user()->role === 'admin' && auth()->user()->organization_id !== null) {
+        $user = auth()->user();
+        if (auth()->check() && in_array($user->role, ['tenant_admin', 'organization_admin'])) {
             return $next($request);
         }
 

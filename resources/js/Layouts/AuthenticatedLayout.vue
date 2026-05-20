@@ -24,6 +24,10 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import AcademySwitcher from '@/Components/AcademySwitcher.vue';
 import axios from 'axios';
 
+const props = defineProps({
+    fullWorkspace: { type: Boolean, default: false }
+});
+
 const showingNavigationDropdown = ref(false);
 const sidebarOpen = ref(true);
 
@@ -58,27 +62,33 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 const academy = computed(() => page.props.auth.academy);
 
+const isGlobalContext = computed(() => {
+    // page.url is reactive in Inertia — updates on every SPA navigation
+    const pathname = page.url ?? '';
+
+    // These paths are always global/account level, regardless of active academy
+    const globalPaths = ['/profile', '/lobby', '/academy/create'];
+    return globalPaths.some(p => pathname.startsWith(p));
+});
+
 const topNavItems = computed(() => {
     const items = [];
     const url = page.props.ziggy?.location ?? window.location.pathname;
 
-    if (academy.value) {
-        items.push(
-            {
-                name: 'Dashboard',
-                href: route('dashboard'),
-                icon: LayoutDashboard,
-                active: url.includes('/dashboard') && !url.includes('/expert')
-            }
-        );
-        
+    if (!isGlobalContext.value && academy.value) {
         if (user.value.role === 'expert') {
             items.push(
                 {
-                    name: 'Review Queue',
+                    name: 'Dashboard',
                     href: route('expert.dashboard'),
+                    icon: LayoutDashboard,
+                    active: url.includes('/expert/dashboard')
+                },
+                {
+                    name: 'Review Queue',
+                    href: route('expert.review-queue'),
                     icon: ClipboardCheck,
-                    active: url.includes('/expert/dashboard') || url.includes('/expert/review-queue')
+                    active: url.includes('/expert/review-queue')
                 },
                 {
                     name: 'Quiz Bank',
@@ -93,7 +103,32 @@ const topNavItems = computed(() => {
                     active: url.includes('/expert/rubric-bank')
                 }
             );
+        } else {
+            items.push(
+                {
+                    name: 'Dashboard',
+                    href: route('dashboard'),
+                    icon: LayoutDashboard,
+                    active: url.includes('/dashboard') && !url.includes('/expert')
+                }
+            );
         }
+    } else {
+        // Global / Account context
+        items.push(
+            {
+                name: 'My Organizations',
+                href: route('lobby'),
+                icon: LayoutDashboard,
+                active: url.includes('/lobby')
+            },
+            {
+                name: 'Profile Settings',
+                href: route('profile.edit'),
+                icon: Settings,
+                active: url.includes('/profile')
+            }
+        );
     }
 
     return items;
@@ -120,7 +155,7 @@ const bottomNavItems = computed(() => {
         <!-- CORE LAYOUT CONTAINER (Shifted for Switcher) -->
         <div class="flex-1 flex ml-[72px] overflow-hidden">
             <!-- Persistent Sidebar -->
-            <aside v-if="academy" :class="[sidebarOpen ? 'w-72' : 'w-20']" 
+            <aside v-if="!props.fullWorkspace" :class="[sidebarOpen ? 'w-72' : 'w-20']" 
                    class="bg-white border-r border-slate-200 transition-all duration-300 ease-in-out hidden lg:flex flex-col z-30">
                 <div class="p-6 flex items-center gap-3">
                     <div class="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-200">
@@ -128,9 +163,9 @@ const bottomNavItems = computed(() => {
                     </div>
                     <div v-if="sidebarOpen" class="flex flex-col overflow-hidden">
                         <span class="font-bold text-lg text-slate-900 tracking-tight transition-opacity duration-300 truncate">
-                            {{ academy?.name || 'MicroEducate' }}
+                            {{ isGlobalContext ? 'Global Hub' : (academy?.name || 'Workspace Selector') }}
                         </span>
-                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{{ academy ? 'Internal Academy' : 'Global Hub' }}</span>
+                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{{ isGlobalContext ? 'Account Management' : 'Internal Academy' }}</span>
                     </div>
                 </div>
 
@@ -174,7 +209,7 @@ const bottomNavItems = computed(() => {
             <!-- Main Content Area -->
             <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <!-- Top Header -->
-                <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 h-20 flex items-center justify-between px-6 sticky top-0 z-20">
+                <header v-if="!props.fullWorkspace" class="bg-white/80 backdrop-blur-md border-b border-slate-200 h-20 flex items-center justify-between px-6 sticky top-0 z-20">
                     <div class="flex items-center gap-4">
                         <button @click="sidebarOpen = !sidebarOpen" class="hidden lg:flex p-2 text-slate-400 hover:text-slate-600 transition-colors">
                             <Menu v-if="!sidebarOpen" class="w-6 h-6" />
@@ -185,6 +220,11 @@ const bottomNavItems = computed(() => {
                             <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input type="text" placeholder="Search..." 
                                    class="bg-slate-50 border-transparent focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50/50 rounded-xl pl-10 pr-4 py-2 text-sm w-64 transition-all" />
+                        </div>
+
+                        <!-- Breadcrumbs Slot -->
+                        <div class="hidden md:flex ml-4 flex-1">
+                            <slot name="breadcrumbs" />
                         </div>
 
                         <div class="h-6 w-[1px] bg-slate-200 ml-2"></div>
@@ -248,16 +288,16 @@ const bottomNavItems = computed(() => {
                 </header>
 
                 <!-- Scrollable Page Container -->
-                <main class="flex-1 overflow-y-auto p-6 md:p-10">
+                <main :class="props.fullWorkspace ? 'p-0' : 'p-6 md:p-10'" class="flex-1 overflow-hidden flex flex-col">
                     <!-- Optional Header Slot -->
-                    <div v-if="$slots.header" class="mb-10">
+                    <div v-if="!props.fullWorkspace && $slots.header" class="mb-10">
                         <slot name="header" />
                     </div>
                     
                     <slot />
 
                     <!-- Simple Footer -->
-                    <footer class="mt-20 py-10 border-t border-slate-200 text-center">
+                    <footer v-if="!props.fullWorkspace" class="mt-20 py-10 border-t border-slate-200 text-center">
                         <p class="text-sm text-slate-400 font-medium tracking-tight">
                             &copy; 2026 MicroEducate Platform. Build for Community Led Learning.
                         </p>
