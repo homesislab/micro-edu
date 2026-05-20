@@ -19,8 +19,9 @@ class EvaluationController extends Controller
     public function submitTest(Request $request, Enrollment $enrollment, $curriculumItemId, string $type)
     {
         $validated = $request->validate([
-            'answers' => 'required|array',
+            'answers' => 'nullable|array',
         ]);
+        $answers = $validated['answers'] ?? [];
 
         if (!in_array($type, ['pretest', 'posttest'])) {
             return back()->with('error', 'Tipe evaluasi tidak valid.');
@@ -45,24 +46,24 @@ class EvaluationController extends Controller
             ->where('type', $type)
             ->get();
 
-        if ($questions->count() === 0) {
-            return back()->with('error', 'Tidak ada pertanyaan untuk evaluasi ini. Silakan tambahkan soal terlebih dahulu.');
-        }
-
         $correctCount = 0;
-        foreach ($questions as $question) {
-            $userAnswer = $validated['answers'][$question->id] ?? null;
-            if ($userAnswer === $question->correct_key) {
-                $correctCount++;
+        if ($questions->count() > 0) {
+            foreach ($questions as $question) {
+                $userAnswer = $answers[$question->id] ?? null;
+                if ($userAnswer === $question->correct_key) {
+                    $correctCount++;
+                }
             }
+            $score = round(($correctCount / $questions->count()) * 100);
+        } else {
+            // Auto-pass with 100 if there are no questions so user isn't stuck
+            $score = 100;
         }
-
-        $score = round(($correctCount / $questions->count()) * 100);
 
         // Save evaluation record with Item ID
         EvaluationL2Test::updateOrCreate(
             ['enrollment_id' => $enrollment->id, 'curriculum_item_id' => $curriculumItem->id, 'type' => $type],
-            ['answers' => $validated['answers'], 'score' => $score]
+            ['answers' => $answers, 'score' => $score]
         );
 
         // Aggregate Delta
