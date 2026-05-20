@@ -16,7 +16,7 @@ class EvaluationController extends Controller
     /**
      * Submit Pre-test or Post-test
      */
-    public function submitTest(Request $request, Enrollment $enrollment, \App\Models\CurriculumItem $curriculumItem, string $type)
+    public function submitTest(Request $request, Enrollment $enrollment, $curriculumItemId, string $type)
     {
         $validated = $request->validate([
             'answers' => 'required|array',
@@ -24,6 +24,21 @@ class EvaluationController extends Controller
 
         if (!in_array($type, ['pretest', 'posttest'])) {
             return back()->with('error', 'Tipe evaluasi tidak valid.');
+        }
+
+        // Resolve or auto-create curriculum item for legacy courses
+        $curriculumItem = \App\Models\CurriculumItem::find($curriculumItemId);
+        if (!$curriculumItem) {
+            // Auto-create a default module + item for courses without curriculum structure
+            $module = \App\Models\Module::firstOrCreate(
+                ['course_id' => $enrollment->course_id, 'title' => 'Default Module'],
+                ['order' => 0]
+            );
+            $subType = $type === 'pretest' ? 'pre_test' : 'final_exam';
+            $curriculumItem = \App\Models\CurriculumItem::firstOrCreate(
+                ['module_id' => $module->id, 'type' => 'knowledge', 'sub_type' => $subType],
+                ['title' => ucfirst($type), 'order' => $type === 'pretest' ? 0 : 1]
+            );
         }
 
         $questions = TestQuestion::where('course_id', $enrollment->course_id)
@@ -52,6 +67,22 @@ class EvaluationController extends Controller
 
         // Aggregate Delta
         $enrollment->calculateDelta();
+
+        // Advance enrollment status based on test type
+        if ($type === 'pretest' && $enrollment->status === 'enrolled') {
+            $enrollment->update([
+                'status' => 'pre_test_done',
+                'pretest_score' => $score,
+                'points' => ($enrollment->points ?? 0) + 10,
+            ]);
+        } elseif ($type === 'posttest' && in_array($enrollment->status, ['attended', 'fast_tracked'])) {
+            $enrollment->update([
+                'status' => 'post_test_done',
+                'posttest_score' => $score,
+                'score_delta' => $score - ($enrollment->pretest_score ?? 0),
+                'points' => ($enrollment->points ?? 0) + 20,
+            ]);
+        }
 
         return back()->with('success', ucfirst($type) . ' submitted successfully!');
     }
@@ -84,7 +115,7 @@ class EvaluationController extends Controller
     /**
      * Submit L3 Assignment (Behavior)
      */
-    public function submitAssignment(Request $request, Enrollment $enrollment, \App\Models\CurriculumItem $curriculumItem)
+    public function submitAssignment(Request $request, Enrollment $enrollment, $curriculumItemId)
     {
         $validated = $request->validate([
             'submission_type' => 'required|in:file,link',
@@ -92,6 +123,19 @@ class EvaluationController extends Controller
             'link_url' => 'required_if:submission_type,link|nullable|url',
             'description' => 'nullable|string',
         ]);
+
+        // Resolve or auto-create curriculum item for legacy courses
+        $curriculumItem = \App\Models\CurriculumItem::find($curriculumItemId);
+        if (!$curriculumItem) {
+            $module = \App\Models\Module::firstOrCreate(
+                ['course_id' => $enrollment->course_id, 'title' => 'Default Module'],
+                ['order' => 0]
+            );
+            $curriculumItem = \App\Models\CurriculumItem::firstOrCreate(
+                ['module_id' => $module->id, 'type' => 'exercise'],
+                ['title' => 'Assignment', 'order' => 2]
+            );
+        }
 
         $filePath = null;
         if ($request->hasFile('file')) {

@@ -818,4 +818,26 @@ class ExpertController extends Controller
             'percentage' => $total > 0 ? round(($earned / $total) * 100, 1) : 0,
         ];
     }
+
+    /**
+     * Upload a file asset and return its public URL
+     */
+    public function uploadItemAsset(Request $request, Course $course)
+    {
+        $this->assertCourseOwner($course);
+
+        $request->validate([
+            'file' => 'required|file|max:51200', // max 50MB
+        ]);
+
+        $path = $request->file('file')->store(
+            "course_assets/{$course->id}",
+            'public'
+        );
+
+        return response()->json([
+            'url' => asset("storage/{$path}"),
+            'path' => $path,
+        ]);
+    }
 }

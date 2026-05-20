@@ -74,7 +74,7 @@ Route::middleware(['auth'])->group(function () {
 
             // Default: Student Dashboard
             $props = [
-                'enrollments' => Enrollment::where('user_id', $user->id)->with('course')->get(),
+                'enrollments' => Enrollment::where('user_id', $user->id)->with('course.modules.curriculumItems')->get(),
                 'certificates' => \App\Models\UserCertificate::where('user_id', $user->id)->with('course')->get(),
                 'availableCourses' => Course::where('status', 'published')->limit(5)->get(),
                 'leaderboard' => User::orderBy('points', 'desc')->limit(10)->get(),
@@ -194,6 +194,7 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('/items/{item}', [ExpertController::class, 'updateItem'])->name('expert.items.update');
             Route::delete('/items/{item}', [ExpertController::class, 'deleteItem'])->name('expert.items.delete');
             Route::post('/modules/{module}/items/reorder', [ExpertController::class, 'reorderItems'])->name('expert.items.reorder');
+            Route::post('/courses/{course}/items/upload-asset', [ExpertController::class, 'uploadItemAsset'])->name('expert.items.upload-asset');
         });
     });
 });

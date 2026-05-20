@@ -63,19 +63,23 @@ class RubricController extends Controller
                         // Get default or specific template
                         $template = CertificateTemplate::where('is_default', true)->first();
 
-                        $cert = UserCertificate::create([
-                            'user_id' => $enrollment->user_id,
-                            'course_id' => $courseId,
-                            'template_id' => $template ? $template->id : null,
-                            'certificate_code' => strtoupper(Str::random(10)),
-                            'issued_at' => now(),
-                        ]);
+                        if (!$template) {
+                            \Log::warning('Cannot generate certificate: no default certificate template found for course ' . $courseId);
+                        } else {
+                            $cert = UserCertificate::create([
+                                'user_id' => $enrollment->user_id,
+                                'course_id' => $courseId,
+                                'template_id' => $template->id,
+                                'certificate_code' => strtoupper(Str::random(10)),
+                                'issued_at' => now(),
+                            ]);
 
-                        // Generate the PDF
-                        try {
-                            $mediaService->generateCertificate($cert);
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to generate certificate PDF: ' . $e->getMessage());
+                            // Generate the PDF
+                            try {
+                                $mediaService->generateCertificate($cert);
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to generate certificate PDF: ' . $e->getMessage());
+                            }
                         }
                     }
                 }

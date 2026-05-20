@@ -55,8 +55,8 @@ class Enrollment extends Model
         $pairsCount = 0;
 
         foreach ($grouped as $itemId => $itemTests) {
-            $pre = $itemTests->where('type', 'pre_test')->first();
-            $post = $itemTests->where('type', 'final_exam')->first();
+            $pre = $itemTests->where('type', 'pretest')->first();
+            $post = $itemTests->where('type', 'posttest')->first();
 
             if ($pre && $post) {
                 $preSum += $pre->score;
@@ -93,7 +93,7 @@ class Enrollment extends Model
         foreach ($masteryItems as $item) {
             $bestScore = $this->l2Tests()
                 ->where('curriculum_item_id', $item->id)
-                ->where('type', 'final_exam')
+                ->where('type', 'posttest')
                 ->max('score');
 
             if (!$bestScore || $bestScore < $this->course->passing_grade) {

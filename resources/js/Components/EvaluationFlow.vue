@@ -25,7 +25,25 @@ import {
 
 const props = defineProps({
     enrollment: Object,
-    item: Object,
+    item: { type: Object, default: null },
+});
+
+// ─── Auto-resolve curriculum items from enrollment's course ──────────────────
+const allCurriculumItems = computed(() => {
+    const modules = props.enrollment?.course?.modules ?? [];
+    return modules.flatMap(m => m.curriculum_items ?? []);
+});
+
+const resolvedPreTestItem = computed(() => {
+    return props.item ?? allCurriculumItems.value.find(i => i.type === 'knowledge' && i.sub_type === 'pre_test') ?? { id: 0 };
+});
+
+const resolvedPostTestItem = computed(() => {
+    return props.item ?? allCurriculumItems.value.find(i => i.type === 'knowledge' && i.sub_type === 'final_exam') ?? { id: 0 };
+});
+
+const resolvedExerciseItem = computed(() => {
+    return props.item ?? allCurriculumItems.value.find(i => i.type === 'exercise') ?? { id: 0 };
 });
 
 const questions = ref([]);
@@ -84,7 +102,8 @@ const fetchQuestions = async (type) => {
 };
 
 const submitTest = (type) => {
-    testForm.post(route('evaluation.submitTest', { enrollment: props.enrollment.id, curriculumItem: props.item.id, type }), {
+    const itemId = type === 'pretest' ? resolvedPreTestItem.value.id : resolvedPostTestItem.value.id;
+    testForm.post(route('evaluation.submitTest', { enrollment: props.enrollment.id, curriculumItem: itemId, type }), {
         onSuccess: () => {
             questions.value = [];
             testForm.reset();
@@ -97,7 +116,7 @@ const submitFeedback = () => {
 };
 
 const submitAssignment = () => {
-    assignmentForm.post(route('evaluation.submitAssignment', { enrollment: props.enrollment.id, curriculumItem: props.item.id }));
+    assignmentForm.post(route('evaluation.submitAssignment', { enrollment: props.enrollment.id, curriculumItem: resolvedExerciseItem.value.id }));
 };
 
 const submitAttendance = () => {
@@ -116,7 +135,7 @@ const isStepActive = (stepStatus) => props.enrollment?.status === stepStatus;
 const steps = [
     { key: 'enrolled', label: 'Pre-test', icon: FileText },
     { key: 'pre_test_done', label: 'Materi', icon: BookOpen },
-    { key: 'content_done', label: 'Post-test', icon: ClipboardCheck },
+    { key: 'content_done', label: 'Absensi', icon: ClipboardCheck },
     { key: 'post_test_done', label: 'Feedback', icon: Star },
     { key: 'l1_done', label: 'Assignment', icon: UploadCloud },
     { key: 'l3_submitted', label: 'Completed', icon: Trophy },

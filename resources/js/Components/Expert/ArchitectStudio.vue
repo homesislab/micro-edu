@@ -50,7 +50,44 @@ const props = defineProps({
 const emit = defineEmits(['add-module', 'edit-module', 'delete-module', 'add-item', 'edit-item', 'delete-item', 'generate-ai']);
 
 // ─── Workspace State ─────────────────────────────────────────────────────────
-const modules = ref(props.course.modules?.map(m => ({ ...m, expanded: true })) || []);
+
+// Content extraction helper (must be defined before normalizeModules)
+const extractContentBody = (content) => {
+    if (!content) return '';
+    if (typeof content === 'string') return content;
+    if (typeof content === 'object') {
+        if (content.body) return content.body;
+        if (content.time_limit !== undefined || content.inline_questions !== undefined) return '';
+        return JSON.stringify(content, null, 2);
+    }
+    return String(content);
+};
+
+// Store original content objects to preserve quiz settings
+const originalContentMap = ref({});
+
+// Normalize modules: convert item.content objects to display strings
+const normalizeModules = (rawModules, existingModules = []) => {
+    return rawModules?.map(m => {
+        const existing = existingModules.find(ex => ex.id === m.id);
+        return {
+            ...m,
+            expanded: existing ? existing.expanded : true,
+            curriculum_items: (m.curriculum_items || []).map(item => {
+                // Preserve original object in map for quiz settings extraction
+                if (item.content && typeof item.content === 'object') {
+                    originalContentMap.value[item.id] = item.content;
+                }
+                return {
+                    ...item,
+                    _contentStr: extractContentBody(item.content),
+                };
+            })
+        };
+    }) || [];
+};
+
+const modules = ref(normalizeModules(props.course.modules));
 const activeModuleId = ref(null);
 const activeItemId = ref(null);
 const activeInspectorType = ref('course'); // 'course' | 'module' | 'item'
@@ -186,7 +223,7 @@ const selectItem = (item, moduleId) => {
     itemForm.title = item.title;
     itemForm.type = item.type;
     itemForm.sub_type = item.sub_type;
-    itemForm.content = item.content;
+    itemForm.content = item._contentStr ?? extractContentBody(item.content);
     itemForm.assessment_mode = item.assessment_mode;
     itemForm.passing_grade = item.passing_grade ?? 75;
     itemForm.is_capstone = !!item.is_capstone;
@@ -194,7 +231,8 @@ const selectItem = (item, moduleId) => {
 
     if (item.type === 'knowledge' && item.content) {
         try {
-            const data = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+            const orig = originalContentMap.value[item.id];
+            const data = orig ?? (typeof item.content === 'string' ? JSON.parse(item.content) : item.content) ?? {};
             itemForm.time_limit = data.time_limit ?? 0;
             itemForm.max_attempts = data.max_attempts ?? 0;
             itemForm.shuffle_questions = !!data.shuffle_questions;
@@ -298,6 +336,55 @@ const handleDeleteItem = (id) => {
 // Close add menu on outside click
 const closeAddMenu = () => { activeAddMenu.value = null; };
 
+// ─── Link Asset Modal ────────────────────────────────────────────────────────
+const showLinkAssetModal = ref(false);
+const linkAssetItemId = ref(null);
+const linkAssetType = ref('url'); // 'url' or 'file'
+const linkAssetUrl = ref('');
+const linkAssetFile = ref(null);
+
+const openLinkAsset = (itemId) => {
+    linkAssetItemId.value = itemId;
+    linkAssetUrl.value = '';
+    linkAssetFile.value = null;
+    linkAssetType.value = 'url';
+    showLinkAssetModal.value = true;
+};
+
+const handleLinkAssetFile = (e) => {
+    linkAssetFile.value = e.target.files[0];
+};
+
+const applyLinkAsset = () => {
+    if (linkAssetType.value === 'url' && linkAssetUrl.value) {
+        // Insert URL into the active textarea content
+        itemForm.content = (itemForm.content ? itemForm.content + '\n' : '') + linkAssetUrl.value;
+        // Also update the item's display string
+        const mod = modules.value.find(m => m.id === activeModuleId.value);
+        if (mod) {
+            const item = mod.curriculum_items.find(i => i.id === linkAssetItemId.value);
+            if (item) item._contentStr = itemForm.content;
+        }
+    } else if (linkAssetType.value === 'file' && linkAssetFile.value) {
+        // Upload file via FormData
+        const fd = new FormData();
+        fd.append('file', linkAssetFile.value);
+        fd.append('item_id', linkAssetItemId.value);
+        axios.post(route('expert.items.upload-asset', props.course.id), fd)
+            .then(res => {
+                const url = res.data.url;
+                itemForm.content = (itemForm.content ? itemForm.content + '\n' : '') + url;
+                const mod = modules.value.find(m => m.id === activeModuleId.value);
+                if (mod) {
+                    const item = mod.curriculum_items.find(i => i.id === linkAssetItemId.value);
+                    if (item) item._contentStr = itemForm.content;
+                }
+            })
+            .catch(err => console.error('Upload failed:', err));
+    }
+    showLinkAssetModal.value = false;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ITEM_TYPES = {
     literal: { label: 'Literal', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -317,10 +404,7 @@ const getMeta = (type, sub_type = null) => {
 
 // Sync local modules ref with props when course updates
 watch(() => props.course.modules, (newModules) => {
-    modules.value = newModules?.map(m => {
-        const existing = modules.value.find(ex => ex.id === m.id);
-        return { ...m, expanded: existing ? existing.expanded : true };
-    }) || [];
+    modules.value = normalizeModules(newModules, modules.value);
 }, { deep: true });
 
 // ─── AI Architect Modal ───────────────────────────────────────────────────────
@@ -592,14 +676,17 @@ const handleDeploy = () => {
 
                                     <label class="text-[10px] font-black uppercase tracking-widest text-slate-600">Content Narrative</label>
                                     <div class="bg-[#161920] rounded-2xl border border-white/10 overflow-hidden focus-within:border-indigo-500/50 transition-all shadow-2xl">
-                                        <textarea v-model="item.content" rows="12" 
-                                                  @input="itemForm.content = item.content"
+                                        <!-- Active item: editable, bound to itemForm -->
+                                        <textarea v-if="activeItemId === item.id" v-model="itemForm.content" rows="12" 
                                                   placeholder="Enter markdown, video URL, or quiz logic..."
                                                   class="w-full bg-transparent border-none focus:ring-0 p-8 text-slate-300 font-medium leading-relaxed resize-none"></textarea>
+                                        <!-- Inactive items: read-only, pre-normalized string -->
+                                        <textarea v-else :value="item._contentStr" rows="12" readonly
+                                                  class="w-full bg-transparent border-none focus:ring-0 p-8 text-slate-500 font-medium leading-relaxed resize-none cursor-default"></textarea>
                                     </div>
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-4">
-                                            <button class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
+                                            <button @click="openLinkAsset(item.id)" class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
                                                 <Database class="w-3.5 h-3.5" /> Link Asset
                                             </button>
                                             <button @click="router.get(route('expert.courses.preview', props.course.id))"
@@ -858,6 +945,57 @@ const handleDeploy = () => {
                         <Loader2 v-if="isAILoading" class="w-3.5 h-3.5 animate-spin" />
                         <Sparkles v-else class="w-3.5 h-3.5" />
                         {{ isAILoading ? 'Generating...' : 'Generate Curriculum' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- ══ Link Asset Modal ══ -->
+    <Teleport to="body">
+        <div v-if="showLinkAssetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showLinkAssetModal = false"></div>
+            <div class="relative w-full max-w-md bg-[#161920] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-emerald-600/20 rounded-xl border border-emerald-500/30 flex items-center justify-center">
+                            <Database class="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <h3 class="text-sm font-black text-white">Link Asset</h3>
+                    </div>
+                    <button @click="showLinkAssetModal = false" class="p-1 text-slate-600 hover:text-white"><X class="w-4 h-4" /></button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="linkAssetType = 'url'"
+                            :class="linkAssetType === 'url' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'"
+                            class="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">External URL</button>
+                    <button @click="linkAssetType = 'file'"
+                            :class="linkAssetType === 'file' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'"
+                            class="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Upload File</button>
+                </div>
+
+                <div v-if="linkAssetType === 'url'" class="space-y-2">
+                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Resource URL</label>
+                    <input v-model="linkAssetUrl" type="url" placeholder="https://youtube.com/watch?v=... or docs link"
+                           class="w-full bg-[#0F1115] rounded-xl border border-white/10 focus:border-emerald-500/30 text-xs font-bold text-white px-4 py-3 placeholder:text-slate-700" />
+                </div>
+
+                <div v-else class="space-y-2">
+                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Upload Asset</label>
+                    <input type="file" @change="handleLinkAssetFile" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx"
+                           class="w-full bg-[#0F1115] rounded-xl border border-white/10 text-xs text-slate-400 px-4 py-3 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-600/20 file:text-emerald-400 file:text-[10px] file:font-black" />
+                    <p v-if="linkAssetFile" class="text-[10px] text-emerald-400 font-bold px-1">{{ linkAssetFile.name }}</p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button @click="showLinkAssetModal = false"
+                            class="flex-1 py-3 bg-white/5 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+                        Cancel
+                    </button>
+                    <button @click="applyLinkAsset"
+                            class="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20">
+                        Insert Asset
                     </button>
                 </div>
             </div>
