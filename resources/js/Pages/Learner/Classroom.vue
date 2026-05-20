@@ -47,7 +47,16 @@ const activeItem = computed(() => {
 const progressPercent = computed(() => {
     if (props.isPreview) return 0;
     if (!props.enrollment) return 0;
-    const statuses = ['pre_test_done', 'attended', 'post_test_done', 'l1_done', 'l3_submitted', 'completed'];
+    const statuses = [
+        'enrolled', 
+        'pre_test_done', 
+        'content_done', 
+        'attended', 
+        'post_test_done', 
+        'l1_done', 
+        'l3_submitted', 
+        'completed'
+    ];
     const idx = statuses.indexOf(props.enrollment.status);
     return idx < 0 ? 0 : Math.round(((idx + 1) / statuses.length) * 100);
 });

@@ -133,9 +133,10 @@ const isStepDone = (stepStatus) => {
 const isStepActive = (stepStatus) => props.enrollment?.status === stepStatus;
 
 const steps = [
-    { key: 'enrolled', label: 'Pre-test', icon: FileText },
+    { key: 'enrolled', label: 'Pre-Test', icon: FileText },
     { key: 'pre_test_done', label: 'Materi', icon: BookOpen },
     { key: 'content_done', label: 'Absensi', icon: ClipboardCheck },
+    { key: 'attended', label: 'Post-Test', icon: ClipboardCheck },
     { key: 'post_test_done', label: 'Feedback', icon: Star },
     { key: 'l1_done', label: 'Assignment', icon: UploadCloud },
     { key: 'l3_submitted', label: 'Completed', icon: Trophy },
