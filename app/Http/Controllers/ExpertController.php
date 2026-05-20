@@ -205,7 +205,19 @@ class ExpertController extends Controller
         $course->load(['modules.curriculumItems', 'testQuestions']);
         return Inertia::render('Expert/CourseBuilder', [
             'course' => $course,
-            'tab' => $request->query('tab', 'curriculum'),
+            'tab'    => $request->query('tab', 'curriculum'),
+        ]);
+    }
+
+    public function coursePreview(Course $course)
+    {
+        $this->assertCourseOwner($course);
+        $course->load(['modules.curriculumItems']);
+
+        return Inertia::render('Learner/Classroom', [
+            'course'     => $course,
+            'enrollment' => null,
+            'isPreview'  => true,
         ]);
     }
 

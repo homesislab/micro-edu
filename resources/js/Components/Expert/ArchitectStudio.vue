@@ -602,7 +602,8 @@ const handleDeploy = () => {
                                             <button class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
                                                 <Database class="w-3.5 h-3.5" /> Link Asset
                                             </button>
-                                            <button class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">
+                                            <button @click="router.get(route('expert.courses.preview', props.course.id))"
+                                                    class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-all">
                                                 <MonitorPlay class="w-3.5 h-3.5" /> Logic Preview
                                             </button>
                                         </div>
@@ -624,10 +625,11 @@ const handleDeploy = () => {
                                 <p class="text-slate-500 max-w-md mx-auto leading-relaxed">Select a module or unit from the outline on the left to begin editing. Architect Studio provides a high-performance environment for curriculum scaling.</p>
                             </div>
                             <div class="grid grid-cols-2 gap-4 max-w-lg mx-auto">
-                                <div class="p-6 bg-[#161920] border border-white/5 rounded-3xl text-left hover:border-indigo-500/50 transition-all group cursor-pointer">
+                                <div class="p-6 bg-[#161920] border border-white/5 rounded-3xl text-left hover:border-indigo-500/50 transition-all group cursor-pointer"
+                                     @click="router.get(route('expert.courses.preview', props.course.id))">
                                     <MonitorPlay class="w-6 h-6 text-indigo-500 mb-4 group-hover:scale-110 transition-transform" />
                                     <h4 class="text-sm font-black text-white">Live Preview</h4>
-                                    <p class="text-[10px] text-slate-500 mt-2">Test your mission logic and content flow in real-time.</p>
+                                    <p class="text-[10px] text-slate-500 mt-2">See your course exactly as a student would experience it.</p>
                                 </div>
                                 <div class="p-6 bg-[#161920] border border-white/5 rounded-3xl text-left hover:border-emerald-500/50 transition-all group cursor-pointer" @click="handleAddModule">
                                     <PlusCircle class="w-6 h-6 text-emerald-500 mb-4 group-hover:scale-110 transition-transform" />

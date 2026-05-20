@@ -138,6 +138,7 @@ Route::middleware(['auth'])->group(function () {
             });
 
             Route::get('/courses/{course}/builder', [ExpertController::class, 'courseBuilder'])->name('expert.courses.builder');
+            Route::get('/courses/{course}/preview', [ExpertController::class, 'coursePreview'])->name('expert.courses.preview');
             Route::get('/courses/{course}/report', [ExpertController::class, 'downloadReport'])->name('expert.courses.report');
             Route::post('/courses', [ExpertController::class, 'store'])->name('expert.courses.store');
             Route::delete('/courses/{course}', [ExpertController::class, 'deleteCourse'])->name('expert.courses.delete');
